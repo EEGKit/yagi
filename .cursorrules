@@ -1,0 +1,5 @@
+Any CONTEND_DELTA functions in C should be replaced with assert_relative_eq! in Rust 
+
+Whenever an error tolerance (tol) is specified in a C test, it should be preserved when translated to Rust. Each test function should maintain the same tolerance as the original C test function.
+
+When translating a C test to Rust, if the original function name starts with autotest, then the Rust test should have a liquid_test_annotate annotation containing the original function name. For example, if the C function is named autotest_foo, then the Rust test should be annotated #[liquid_test_annotate(autotest_foo)].
