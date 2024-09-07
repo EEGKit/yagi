@@ -1,10 +1,10 @@
 [package]
 name = "yagi"
 version = "0.0.1"
+edition = "2021"
 repository = "https://github.com/brian-armstrong/yagi"
 description = "Batteries-included DSP library"
 license = "MIT"
-license-file = "LICENSE"
 
 [profile.dev]
 opt-level = 2
