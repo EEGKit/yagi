@@ -1,6 +1,7 @@
 [package]
 name = "yagi"
 version = "0.0.1"
+repository = "https://github.com/brian-armstrong/yagi"
 
 [profile.dev]
 opt-level = 2
