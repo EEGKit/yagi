@@ -1,3 +1,8 @@
+// Dotprod module
+// Current state:
+// - Dotprod ready to use (+autotests)
+// - sumsq missing
+
 use num_complex::Complex;
 
 #[cfg(feature = "simd")]
@@ -6,13 +11,13 @@ use std::simd::num::SimdFloat;
 use std::simd::{f32x8, simd_swizzle};
 
 pub trait DotProd<Rhs> {
-    type Out;
+    type Output;
 
-    fn dotprod(&self, other: &[Rhs]) -> Self::Out;
+    fn dotprod(&self, other: &[Rhs]) -> Self::Output;
 }
 
 impl DotProd<f32> for [f32] {
-    type Out = f32;
+    type Output = f32;
 
     #[cfg(not(feature = "simd"))]
     fn dotprod(&self, other: &[f32]) -> f32 {
@@ -26,7 +31,7 @@ impl DotProd<f32> for [f32] {
 }
 
 impl DotProd<Complex<f32>> for [f32] {
-    type Out = Complex<f32>;
+    type Output = Complex<f32>;
 
     #[cfg(not(feature = "simd"))]
     fn dotprod(&self, other: &[Complex<f32>]) -> Complex<f32> {
@@ -40,7 +45,7 @@ impl DotProd<Complex<f32>> for [f32] {
 }
 
 impl DotProd<f32> for [Complex<f32>] {
-    type Out = Complex<f32>;
+    type Output = Complex<f32>;
 
     #[cfg(not(feature = "simd"))]
     fn dotprod(&self, other: &[f32]) -> Complex<f32> {
@@ -54,7 +59,7 @@ impl DotProd<f32> for [Complex<f32>] {
 }
 
 impl DotProd<Complex<f32>> for [Complex<f32>] {
-    type Out = Complex<f32>;
+    type Output = Complex<f32>;
 
     #[cfg(not(feature = "simd"))]
     fn dotprod(&self, other: &[Complex<f32>]) -> Complex<f32> {
@@ -64,6 +69,54 @@ impl DotProd<Complex<f32>> for [Complex<f32>] {
     #[cfg(feature = "simd")]
     fn dotprod(&self, other: &[Complex<f32>]) -> Complex<f32> {
         dotprod_ccc_simd8(self, other)
+    }
+}
+
+impl DotProd<f32> for std::collections::VecDeque<f32> {
+    type Output = f32;
+
+    fn dotprod(&self, other: &[f32]) -> f32 {
+        let (l, r) = self.as_slices();
+        let split_idx = l.len();
+        let l_sum = l.dotprod(&other[..split_idx]);
+        let r_sum = r.dotprod(&other[split_idx..]);
+        l_sum + r_sum
+    }
+}
+
+impl DotProd<Complex<f32>> for std::collections::VecDeque<f32> {
+    type Output = Complex<f32>;
+
+    fn dotprod(&self, other: &[Complex<f32>]) -> Complex<f32> {
+        let (l, r) = self.as_slices();
+        let split_idx = l.len();
+        let l_sum = l.dotprod(&other[..split_idx]);
+        let r_sum = r.dotprod(&other[split_idx..]);
+        l_sum + r_sum
+    }
+}
+
+impl DotProd<f32> for std::collections::VecDeque<Complex<f32>> {
+    type Output = Complex<f32>;
+
+    fn dotprod(&self, other: &[f32]) -> Complex<f32> {
+        let (l, r) = self.as_slices();
+        let split_idx = l.len();
+        let l_sum = l.dotprod(&other[..split_idx]);
+        let r_sum = r.dotprod(&other[split_idx..]);
+        l_sum + r_sum
+    }
+}
+
+impl DotProd<Complex<f32>> for std::collections::VecDeque<Complex<f32>> {
+    type Output = Complex<f32>;
+
+    fn dotprod(&self, other: &[Complex<f32>]) -> Complex<f32> {
+        let (l, r) = self.as_slices();
+        let split_idx = l.len();
+        let l_sum = l.dotprod(&other[..split_idx]);
+        let r_sum = r.dotprod(&other[split_idx..]);
+        l_sum + r_sum
     }
 }
 
@@ -228,8 +281,12 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use rand::Rng;
+    use test_macro::autotest_annotate;
 
     type Cf32 = Complex<f32>;
+
+    // TODO we may want to consider removing the "struct" series of tests
+    //   since we don't have that
 
     #[test]
     fn test_dotprod_rrr() {
@@ -246,6 +303,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_rrrf_basic)]
     fn test_dotprod_rrrf_basic() {
         const TOL: f32 = 1e-6;
         let h: Vec<f32> = vec![1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
@@ -266,6 +324,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_rrrf_uneven)]
     fn test_dotprod_rrrf_uneven() {
         const TOL: f32 = 1e-6;
         let h: Vec<f32> = vec![1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0];
@@ -280,16 +339,26 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_rrrf_rand01)]
     fn test_dotprod_rrrf_rand01() {
         const TOL: f32 = 1e-3;
+
+        // Format the following array with 4 columns, fixed width, 12 spaces per column
+        #[rustfmt::skip]
         let h: Vec<f32> = vec![
-            -0.050565, -0.952580, 0.274320, 1.232400, 1.268200, 0.565770, 0.800830, 0.923970, 0.517060, -0.530340, -0.378550, -1.127100,
-            1.123100, -1.006000, -1.483800, -0.062007,
+            -0.050565,   -0.952580,    0.274320,    1.232400,
+             1.268200,    0.565770,    0.800830,    0.923970,
+             0.517060,   -0.530340,   -0.378550,   -1.127100,
+             1.123100,   -1.006000,   -1.483800,   -0.062007,
         ];
 
+        // Format the following array with 4 columns, fixed width, 12 spaces per column
+        #[rustfmt::skip]
         let x: Vec<f32> = vec![
-            -0.384280, -0.812030, 0.156930, 1.919500, 0.564580, -0.123610, -0.138640, 0.004984, -1.100200, -0.497620, 0.089977, -1.745500,
-            0.463640, 0.592100, 1.150000, -1.225400,
+            -0.384280,   -0.812030,    0.156930,    1.919500,
+             0.564580,   -0.123610,   -0.138640,    0.004984,
+            -1.100200,   -0.497620,    0.089977,   -1.745500,
+             0.463640,    0.592100,    1.150000,   -1.225400,
         ];
 
         let test = 3.66411513609863;
@@ -297,16 +366,26 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_rrrf_rand02)]
     fn test_dotprod_rrrf_rand02() {
         const TOL: f32 = 1e-3;
+
+        // Format the following array with 4 columns, fixed width, 12 spaces per column
+        #[rustfmt::skip]
         let h: Vec<f32> = vec![
-            2.595300, 1.243600, -0.818550, -1.439800, 0.055795, -1.476000, 0.445900, 0.325460, -3.451200, 0.058528, -0.246990, 0.476290,
-            -0.598780, -0.885250, 0.464660, -0.610140,
+             2.595300,    1.243600,   -0.818550,   -1.439800,
+             0.055795,   -1.476000,    0.445900,    0.325460,
+            -3.451200,    0.058528,   -0.246990,    0.476290,
+            -0.598780,   -0.885250,    0.464660,   -0.610140,
         ];
 
+        // Format the following array with 4 columns, fixed width, 12 spaces per column
+        #[rustfmt::skip]
         let x: Vec<f32> = vec![
-            -0.917010, -1.278200, -0.533190, 2.309200, 0.592980, 0.964820, 0.183220, -0.082864, 0.057171, -1.186500, -0.738260, 0.356960,
-            -0.144000, -1.435200, -0.893420, 1.657800,
+            -0.917010,   -1.278200,   -0.533190,    2.309200,
+             0.592980,    0.964820,    0.183220,   -0.082864,
+             0.057171,   -1.186500,   -0.738260,    0.356960,
+            -0.144000,   -1.435200,   -0.893420,    1.657800,
         ];
 
         let test = -8.17832326680587;
@@ -317,6 +396,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_rrrf_struct_lengths)]
     fn test_dotprod_rrrf_struct_lengths() {
         const TOL: f32 = 2e-6;
 
@@ -355,7 +435,9 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_rrrf_struct_vs_ordinal)]
     fn test_dotprod_rrrf_struct_vs_ordinal() {
+        // note that since we don't have structured dotproduct, this is just a big random test
         const TOL: f32 = 1e-4;
         let mut rng = rand::thread_rng();
 
@@ -371,25 +453,17 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_crcf_rand01)]
     fn test_dotprod_crcf_rand01() {
         const TOL: f32 = 1e-3;
+
+        // Format the following array with 4 columns, fixed width, 12 spaces per argument
+        #[rustfmt::skip]
         let h: [f32; 16] = [
-            5.5375e-02,
-            -6.5857e-01,
-            -1.7657e+00,
-            7.7444e-01,
-            8.0730e-01,
-            -5.1340e-01,
-            -9.3437e-02,
-            -5.6301e-01,
-            -6.6480e-01,
-            -2.1673e+00,
-            9.0269e-01,
-            3.5284e+00,
-            -9.7835e-01,
-            -6.9512e-01,
-            -1.2958e+00,
-            1.1628e+00,
+             5.5375e-02,  -6.5857e-01,  -1.7657e+00,   7.7444e-01,
+             8.0730e-01,  -5.1340e-01,  -9.3437e-02,  -5.6301e-01,
+            -6.6480e-01,  -2.1673e+00,   9.0269e-01,   3.5284e+00,
+            -9.7835e-01,  -6.9512e-01,  -1.2958e+00,   1.1628e+00,
         ];
 
         // Format the following array with 2 columns, fixed width, 12 spaces per argument
@@ -417,44 +491,30 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_crcf_rand02)]
     fn test_dotprod_crcf_rand02() {
         const TOL: f32 = 1e-3;
+
+        // Format the following array with 4 columns, fixed width, 12 spaces per argument
+        #[rustfmt::skip]
         let h: [f32; 16] = [
-            4.7622e-01,
-            7.1453e-01,
-            -7.1370e-01,
-            -1.6457e-01,
-            -1.1573e-01,
-            6.4114e-01,
-            -1.0688e+00,
-            -1.6761e+00,
-            -1.0376e+00,
-            -1.0991e+00,
-            -2.4161e-01,
-            4.6065e-01,
-            -1.0403e+00,
-            -1.1424e-01,
-            -1.2371e+00,
-            -7.9723e-01,
+             4.7622e-01,   7.1453e-01,  -7.1370e-01,  -1.6457e-01,
+            -1.1573e-01,   6.4114e-01,  -1.0688e+00,  -1.6761e+00,
+            -1.0376e+00,  -1.0991e+00,  -2.4161e-01,   4.6065e-01,
+            -1.0403e+00,  -1.1424e-01,  -1.2371e+00,  -7.9723e-01,
         ];
 
+        // Format the following array with 2 columns, fixed width, 12 spaces per argument
+        #[rustfmt::skip]
         let x: [Cf32; 16] = [
-            Cf32::new(-8.3558e-01, 3.0504e-01),
-            Cf32::new(-6.3004e-01, 2.4680e-01),
-            Cf32::new(9.6908e-01, 1.2978e+00),
-            Cf32::new(-2.0587e+00, 9.5385e-01),
-            Cf32::new(2.5692e-01, -1.7314e+00),
-            Cf32::new(-1.2237e+00, -6.2139e-02),
-            Cf32::new(5.0300e-02, -9.2092e-01),
-            Cf32::new(-1.8816e-01, 7.0746e-02),
-            Cf32::new(-2.4177e+00, 8.3177e-01),
-            Cf32::new(1.6871e-01, -8.5129e-02),
-            Cf32::new(6.5203e-01, 2.0739e-02),
-            Cf32::new(-1.2331e-01, -9.7920e-01),
-            Cf32::new(8.2352e-01, 9.1093e-01),
-            Cf32::new(1.5161e+00, -9.1865e-01),
-            Cf32::new(-2.0892e+00, 2.7759e-02),
-            Cf32::new(-2.5188e-01, 2.5568e-01),
+            Cf32::new(-8.3558e-01,  3.0504e-01),  Cf32::new(-6.3004e-01,  2.4680e-01),
+            Cf32::new( 9.6908e-01,  1.2978e+00),  Cf32::new(-2.0587e+00,  9.5385e-01),
+            Cf32::new( 2.5692e-01, -1.7314e+00),  Cf32::new(-1.2237e+00, -6.2139e-02),
+            Cf32::new( 5.0300e-02, -9.2092e-01),  Cf32::new(-1.8816e-01,  7.0746e-02),
+            Cf32::new(-2.4177e+00,  8.3177e-01),  Cf32::new( 1.6871e-01, -8.5129e-02),
+            Cf32::new( 6.5203e-01,  2.0739e-02),  Cf32::new(-1.2331e-01, -9.7920e-01),
+            Cf32::new( 8.2352e-01,  9.1093e-01),  Cf32::new( 1.5161e+00, -9.1865e-01),
+            Cf32::new(-2.0892e+00,  2.7759e-02),  Cf32::new(-2.5188e-01,  2.5568e-01),
         ];
 
         let test = Cf32::new(2.11053363855085, -2.04167493441477);
@@ -464,7 +524,9 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_crcf_struct_vs_ordinal)]
     fn test_dotprod_crcf_struct_vs_ordinal() {
+        // note another big random test
         let mut rng = rand::thread_rng();
         const TOL: f32 = 1e-4;
 
@@ -484,45 +546,34 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_cccf_rand16)]
     fn test_dotprod_cccf_rand16() {
         const TOL: f32 = 1e-3;
 
+        // Format the following array with 2 columns, fixed width, 12 spaces per argument
+        #[rustfmt::skip]
         let h: [Cf32; 16] = [
-            Cf32::new(0.17702709, 1.38978455),
-            Cf32::new(0.91294148, 0.39217381),
-            Cf32::new(-0.80607338, 0.76477512),
-            Cf32::new(0.05099755, -0.87350051),
-            Cf32::new(0.44513826, -0.49490569),
-            Cf32::new(0.14754967, 2.04349962),
-            Cf32::new(1.07246623, 1.08146290),
-            Cf32::new(-1.14028088, 1.83380899),
-            Cf32::new(0.38105361, -0.45591846),
-            Cf32::new(0.32605401, 0.34440081),
-            Cf32::new(-0.05477144, 0.60832595),
-            Cf32::new(1.81667523, -1.12238075),
-            Cf32::new(-0.87190497, 1.10743858),
-            Cf32::new(1.30921403, 1.24438643),
-            Cf32::new(0.55524695, -1.94931519),
-            Cf32::new(-0.87191170, 0.91693119),
+            Cf32::new( 0.17702709,  1.38978455),  Cf32::new( 0.91294148,  0.39217381),
+            Cf32::new(-0.80607338,  0.76477512),  Cf32::new( 0.05099755, -0.87350051),
+            Cf32::new( 0.44513826, -0.49490569),  Cf32::new( 0.14754967,  2.04349962),
+            Cf32::new( 1.07246623,  1.08146290),  Cf32::new(-1.14028088,  1.83380899),
+            Cf32::new( 0.38105361, -0.45591846),  Cf32::new( 0.32605401,  0.34440081),
+            Cf32::new(-0.05477144,  0.60832595),  Cf32::new( 1.81667523, -1.12238075),
+            Cf32::new(-0.87190497,  1.10743858),  Cf32::new( 1.30921403,  1.24438643),
+            Cf32::new( 0.55524695, -1.94931519),  Cf32::new(-0.87191170,  0.91693119),
         ];
 
+        // Format the following array with 2 columns, fixed width, 12 spaces per argument
+        #[rustfmt::skip]
         let x: [Cf32; 16] = [
-            Cf32::new(-2.19591953, -0.93229692),
-            Cf32::new(0.17150376, 0.56165114),
-            Cf32::new(1.58354529, -0.50696037),
-            Cf32::new(1.40929619, 0.87868803),
-            Cf32::new(-0.75505072, -0.30867372),
-            Cf32::new(-0.09821367, -0.73949106),
-            Cf32::new(0.03785571, 0.72763665),
-            Cf32::new(-1.20262636, -0.88838102),
-            Cf32::new(0.23323685, 0.12456235),
-            Cf32::new(0.34593736, 0.02529594),
-            Cf32::new(0.33669564, 0.39064649),
-            Cf32::new(-2.45003867, -0.54862205),
-            Cf32::new(-2.64870707, 2.33444473),
-            Cf32::new(-0.92284477, -2.45121397),
-            Cf32::new(0.24852918, -0.62409860),
-            Cf32::new(-0.87039907, 0.90921212),
+            Cf32::new(-2.19591953, -0.93229692),  Cf32::new( 0.17150376,  0.56165114),
+            Cf32::new( 1.58354529, -0.50696037),  Cf32::new( 1.40929619,  0.87868803),
+            Cf32::new(-0.75505072, -0.30867372),  Cf32::new(-0.09821367, -0.73949106),
+            Cf32::new( 0.03785571,  0.72763665),  Cf32::new(-1.20262636, -0.88838102),
+            Cf32::new( 0.23323685,  0.12456235),  Cf32::new( 0.34593736,  0.02529594),
+            Cf32::new( 0.33669564,  0.39064649),  Cf32::new(-2.45003867, -0.54862205),
+            Cf32::new(-2.64870707,  2.33444473),  Cf32::new(-0.92284477, -2.45121397),
+            Cf32::new( 0.24852918, -0.62409860),  Cf32::new(-0.87039907,  0.90921212),
         ];
 
         let test = Cf32::new(-0.604285042605890, -12.390925785344704);
@@ -538,83 +589,54 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_cccf_struct_lengths)]
     fn test_dotprod_cccf_struct_lengths() {
         const TOL: f32 = 4e-6;
 
+        // Format the following array with 2 columns, fixed width, 12 spaces per argument
+        #[rustfmt::skip]
         let h: [Cf32; 35] = [
-            Cf32::new(1.11555653, 2.30658043),
-            Cf32::new(-0.36133676, -0.10917327),
-            Cf32::new(0.17714505, -2.14631440),
-            Cf32::new(2.20424609, 0.59063608),
-            Cf32::new(-0.44699194, 0.23369318),
-            Cf32::new(0.60613931, 0.21868288),
-            Cf32::new(-1.18746289, -0.52159563),
-            Cf32::new(-0.46277775, 0.75010157),
-            Cf32::new(0.93796307, 0.28608151),
-            Cf32::new(-2.18699829, 0.38029319),
-            Cf32::new(0.16145611, 0.18343353),
-            Cf32::new(-0.62653631, -1.79037656),
-            Cf32::new(-0.67042462, 0.11044084),
-            Cf32::new(0.70333438, 1.78729174),
-            Cf32::new(-0.32923580, 0.78514690),
-            Cf32::new(0.27534332, -0.56377431),
-            Cf32::new(0.41492559, 1.37176526),
-            Cf32::new(3.25368958, 2.70495218),
-            Cf32::new(1.63002035, -0.14193750),
-            Cf32::new(2.22057186, 0.55056461),
-            Cf32::new(1.40896777, 0.80722903),
-            Cf32::new(-0.22334033, -0.14227395),
-            Cf32::new(-1.48631186, 0.53610531),
-            Cf32::new(-1.91632185, 0.88755083),
-            Cf32::new(-0.52054895, -0.35572001),
-            Cf32::new(-1.56515607, -0.41448794),
-            Cf32::new(-0.91107117, 0.17059659),
-            Cf32::new(-0.77007659, 2.73381816),
-            Cf32::new(-0.46645585, 0.38994666),
-            Cf32::new(0.80317663, -0.41756968),
-            Cf32::new(0.26992512, 0.41828145),
-            Cf32::new(-0.72456446, 1.25002030),
-            Cf32::new(1.19573306, 0.98449546),
-            Cf32::new(1.42491943, -0.55426305),
-            Cf32::new(1.08243614, 0.35774368),
+            Cf32::new( 1.11555653,  2.30658043),  Cf32::new(-0.36133676, -0.10917327),
+            Cf32::new( 0.17714505, -2.14631440),  Cf32::new( 2.20424609,  0.59063608),
+            Cf32::new(-0.44699194,  0.23369318),  Cf32::new( 0.60613931,  0.21868288),
+            Cf32::new(-1.18746289, -0.52159563),  Cf32::new(-0.46277775,  0.75010157),
+            Cf32::new( 0.93796307,  0.28608151),  Cf32::new(-2.18699829,  0.38029319),
+            Cf32::new( 0.16145611,  0.18343353),  Cf32::new(-0.62653631, -1.79037656),
+            Cf32::new(-0.67042462,  0.11044084),  Cf32::new( 0.70333438,  1.78729174),
+            Cf32::new(-0.32923580,  0.78514690),  Cf32::new( 0.27534332, -0.56377431),
+            Cf32::new( 0.41492559,  1.37176526),  Cf32::new( 3.25368958,  2.70495218),
+            Cf32::new( 1.63002035, -0.14193750),  Cf32::new( 2.22057186,  0.55056461),
+            Cf32::new( 1.40896777,  0.80722903),  Cf32::new(-0.22334033, -0.14227395),
+            Cf32::new(-1.48631186,  0.53610531),  Cf32::new(-1.91632185,  0.88755083),
+            Cf32::new(-0.52054895, -0.35572001),  Cf32::new(-1.56515607, -0.41448794),
+            Cf32::new(-0.91107117,  0.17059659),  Cf32::new(-0.77007659,  2.73381816),
+            Cf32::new(-0.46645585,  0.38994666),  Cf32::new( 0.80317663, -0.41756968),
+            Cf32::new( 0.26992512,  0.41828145),  Cf32::new(-0.72456446,  1.25002030),
+            Cf32::new( 1.19573306,  0.98449546),  Cf32::new( 1.42491943, -0.55426305),
+            Cf32::new( 1.08243614,  0.35774368),
         ];
 
+        // Format the following array with 2 columns, fixed width, 12 spaces per argument
+        #[rustfmt::skip]
         let x: [Cf32; 35] = [
-            Cf32::new(-0.82466736, -1.39329228),
-            Cf32::new(-1.46176052, -1.96218827),
-            Cf32::new(-1.28388174, -0.07152934),
-            Cf32::new(-0.51910014, -0.37915971),
-            Cf32::new(-0.65964708, -0.98417534),
-            Cf32::new(-1.40213479, -0.82198463),
-            Cf32::new(0.86051446, 0.97926463),
-            Cf32::new(0.26257342, 0.76586696),
-            Cf32::new(0.72174183, -1.89884636),
-            Cf32::new(-0.26018863, 1.06920599),
-            Cf32::new(0.57949117, -0.77431546),
-            Cf32::new(0.84635184, -0.81123009),
-            Cf32::new(-1.12637629, -0.42027412),
-            Cf32::new(-1.04214881, 0.90519721),
-            Cf32::new(0.54458433, -1.03487314),
-            Cf32::new(-0.17847893, 2.20358978),
-            Cf32::new(0.19642532, -0.07449796),
-            Cf32::new(-1.84958229, 0.13218920),
-            Cf32::new(-1.49042886, 0.81610408),
-            Cf32::new(-0.27466940, -1.48438409),
-            Cf32::new(0.29239375, 0.72443343),
-            Cf32::new(-1.20243456, -2.77032750),
-            Cf32::new(-0.41784260, 0.77455254),
-            Cf32::new(0.37737465, -0.52426993),
-            Cf32::new(-1.25500377, 1.76270122),
-            Cf32::new(1.55976056, -1.18189171),
-            Cf32::new(-0.05111343, -1.18849396),
-            Cf32::new(-1.92966664, 0.66504899),
-            Cf32::new(-2.82387897, 1.41128242),
-            Cf32::new(-1.48171326, -0.03347470),
-            Cf32::new(0.38047273, -1.40969799),
-            Cf32::new(1.71995272, 0.00298203),
-            Cf32::new(0.56040910, -0.12713027),
-            Cf32::new(-0.46653022, -0.65450499),
-            Cf32::new(0.15515755, 1.58944030),
+            Cf32::new(-0.82466736, -1.39329228),  Cf32::new(-1.46176052, -1.96218827),
+            Cf32::new(-1.28388174, -0.07152934),  Cf32::new(-0.51910014, -0.37915971),
+            Cf32::new(-0.65964708, -0.98417534),  Cf32::new(-1.40213479, -0.82198463),
+            Cf32::new( 0.86051446,  0.97926463),  Cf32::new( 0.26257342,  0.76586696),
+            Cf32::new( 0.72174183, -1.89884636),  Cf32::new(-0.26018863,  1.06920599),
+            Cf32::new( 0.57949117, -0.77431546),  Cf32::new( 0.84635184, -0.81123009),
+            Cf32::new(-1.12637629, -0.42027412),  Cf32::new(-1.04214881,  0.90519721),
+            Cf32::new( 0.54458433, -1.03487314),  Cf32::new(-0.17847893,  2.20358978),
+            Cf32::new( 0.19642532, -0.07449796),  Cf32::new(-1.84958229,  0.13218920),
+            Cf32::new(-1.49042886,  0.81610408),  Cf32::new(-0.27466940, -1.48438409),
+            Cf32::new( 0.29239375,  0.72443343),  Cf32::new(-1.20243456, -2.77032750),
+            Cf32::new(-0.41784260,  0.77455254),  Cf32::new( 0.37737465, -0.52426993),
+            Cf32::new(-1.25500377,  1.76270122),  Cf32::new( 1.55976056, -1.18189171),
+            Cf32::new(-0.05111343, -1.18849396),  Cf32::new(-1.92966664,  0.66504899),
+            Cf32::new(-2.82387897,  1.41128242),  Cf32::new(-1.48171326, -0.03347470),
+            Cf32::new( 0.38047273, -1.40969799),  Cf32::new( 1.71995272,  0.00298203),
+            Cf32::new( 0.56040910, -0.12713027),  Cf32::new(-0.46653022, -0.65450499),
+            Cf32::new( 0.15515755,  1.58944030),
         ];
 
         let v32 = Cf32::new(-11.5100903519506, -15.3575526884014);
@@ -633,7 +655,9 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_dotprod_cccf_struct_vs_ordinal)]
     fn test_dotprod_cccf_struct_vs_ordinal() {
+        // note another big random test
         const TOL: f32 = 1e-3;
         let mut rng = rand::thread_rng();
 

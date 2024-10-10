@@ -1,5 +1,6 @@
 use crate::error::{Error, Result};
 
+#[derive(Debug, Clone)]
 pub struct WDelay<T> {
     v: Vec<T>,
     delay: usize,
@@ -56,25 +57,15 @@ impl<T: Default + Clone + Copy> WDelay<T> {
     }
 }
 
-impl<T: Default + Clone + Copy> Clone for WDelay<T> {
-    fn clone(&self) -> Self {
-        WDelay {
-            v: self.v.clone(),
-            delay: self.delay,
-            read_index: self.read_index,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use num_complex::Complex;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
     use approx::assert_relative_eq;
 
     #[test]
-    #[liquid_test_annotate(autotest_wdelayf)]
+    #[autotest_annotate(autotest_wdelayf)]
     fn test_wdelayf() {
         // create wdelay
         // wdelay: 0 0 0 0 0
@@ -130,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_wdelay_copy)]
+    #[autotest_annotate(autotest_wdelay_copy)]
     fn test_wdelay_copy() {
         // create base object
         let delay = 20;

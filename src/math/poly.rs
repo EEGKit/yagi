@@ -382,7 +382,7 @@ where
 /// # Returns
 ///
 /// Interpolated value `y0`
-pub fn poly_interp_lagrange_barycentric<T>(x: &[T], y: &[T], w: &[T], x0: T, n: usize) -> T
+pub fn poly_val_lagrange_barycentric<T>(x: &[T], y: &[T], w: &[T], x0: T, n: usize) -> T
 where
     T: FloatComplex,
 {
@@ -741,12 +741,12 @@ pub fn polyf_findroots(p: &[f32], k: usize, roots: &mut [Complex<f32>]) -> Resul
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
 
     // TODO tests for poly_fit_lagrange_barycentric and poly_interp_lagrange_barycentric
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_fit_q3n3)]
+    #[autotest_annotate(autotest_polyf_fit_q3n3)]
     fn test_polyf_fit_q3n3() {
         let x = [-1.0, 0.0, 1.0];
         let y = [1.0, 0.0, 1.0];
@@ -764,7 +764,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_lagrange_issue165)]
+    #[autotest_annotate(autotest_polyf_lagrange_issue165)]
     fn test_polyf_lagrange_issue165() {
         let x = [-1.0, 0.0, 1.0];
         let y = [7.059105, 24.998369, 14.365907];
@@ -789,7 +789,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_lagrange)]
+    #[autotest_annotate(autotest_polyf_lagrange)]
     fn test_polyf_lagrange() {
         let x = [1.0, 2.0, 3.0];
         let y = [1.0, 8.0, 27.0];
@@ -807,7 +807,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_expandroots_4)]
+    #[autotest_annotate(autotest_polyf_expandroots_4)]
     fn test_polyf_expandroots_4() {
         let roots = [-2.0, -1.0, -4.0, 5.0, 3.0];
         let c_test = [120.0, 146.0, 1.0, -27.0, -1.0, 1.0];
@@ -825,7 +825,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_expandroots_11)]
+    #[autotest_annotate(autotest_polyf_expandroots_11)]
     fn test_polyf_expandroots_11() {
         let roots = [-1.0, -2.0, -3.0, -4.0, -5.0, -6.0, -7.0, -8.0, -9.0, -10.0, -11.0];
         let c_test = [39916800.0, 120543840.0, 150917976.0, 105258076.0, 45995730.0, 13339535.0, 2637558.0, 357423.0, 32670.0, 1925.0, 66.0, 1.0];
@@ -849,7 +849,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polycf_expandroots_4)]
+    #[autotest_annotate(autotest_polycf_expandroots_4)]
     fn test_polycf_expandroots_4() {
         use num_complex::Complex32;
 
@@ -879,7 +879,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_expandroots2_3)]
+    #[autotest_annotate(autotest_polyf_expandroots2_3)]
     fn test_polyf_expandroots2_3() {
         let n = 3;
         let a = [2.0, 3.0, -1.0];
@@ -897,7 +897,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_mul_2_3)]
+    #[autotest_annotate(autotest_polyf_mul_2_3)]
     fn test_polyf_mul_2_3() {
         let a = [2.0, -4.0, 3.0];
         let b = [-9.0, 3.0, -2.0, 5.0];
@@ -916,8 +916,8 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_expandbinomial_n6)]
-    fn test_polyf_expandbinomial_n6() {
+    #[autotest_annotate(autotest_poly_expandbinomial_n6)]
+    fn test_poly_expandbinomial_n6() {
         let n = 6;
         let mut c = vec![0.0f32; n + 1];
         let c_test = [1.0, 6.0, 15.0, 20.0, 15.0, 6.0, 1.0];
@@ -935,8 +935,8 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_expandbinomial_pm_m6_k1)]
-    fn test_polyf_expandbinomial_pm_m6_k1() {
+    #[autotest_annotate(autotest_poly_binomial_expand_pm_m6_k1)]
+    fn test_poly_expandbinomial_pm_m6_k1() {
         let m = 5;
         let k = 1;
         let n = m + k;
@@ -956,8 +956,8 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_expandbinomial_pm_m5_k2)]
-    fn test_polyf_expandbinomial_pm_m5_k2() {
+    #[autotest_annotate(autotest_poly_expandbinomial_pm_m5_k2)]
+    fn test_poly_expandbinomial_pm_m5_k2() {
         let m = 5;
         let k = 2;
         let n = m + k;
@@ -999,7 +999,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_findroots_real)]
+    #[autotest_annotate(autotest_polyf_findroots_real)]
     fn test_polyf_findroots_real() {
         // Basic roots, no complex values
         let p = [6.0, 11.0, -33.0, -33.0, 11.0, 6.0];
@@ -1014,7 +1014,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_findroots_complex)]
+    #[autotest_annotate(autotest_polyf_findroots_complex)]
     fn test_polyf_findroots_complex() {
         // Complex roots
         let p = [3.0, 2.0, 1.0];
@@ -1026,7 +1026,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_findroots_mix)]
+    #[autotest_annotate(autotest_polyf_findroots_mix)]
     fn test_polyf_findroots_mix() {
         // Complex roots
         let p = [-1.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0];
@@ -1042,7 +1042,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_polyf_findroots_mix2)]
+    #[autotest_annotate(autotest_polyf_findroots_mix2)]
     fn test_polyf_findroots_mix2() {
         // Complex roots, longer polynomial
         let p = [

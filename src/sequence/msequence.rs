@@ -1,42 +1,43 @@
 use crate::error::{Error, Result};
 use crate::utility::bits::{bdotprod, msb_index};
 
-const LIQUID_MIN_MSEQUENCE_M: u32 = 2;
-const LIQUID_MAX_MSEQUENCE_M: u32 = 31;
+const MIN_MSEQUENCE_M: u32 = 2;
+const MAX_MSEQUENCE_M: u32 = 31;
 
 // default m-sequence generators:       g (hex)            m   n
-const LIQUID_MSEQUENCE_GENPOLY_M2: u32 = 0x00000003;   //  2   3
-const LIQUID_MSEQUENCE_GENPOLY_M3: u32 = 0x00000006;   //  3   7
-const LIQUID_MSEQUENCE_GENPOLY_M4: u32 = 0x0000000c;   //  4   15
-const LIQUID_MSEQUENCE_GENPOLY_M5: u32 = 0x00000014;   //  5   31
-const LIQUID_MSEQUENCE_GENPOLY_M6: u32 = 0x00000030;   //  6   63
-const LIQUID_MSEQUENCE_GENPOLY_M7: u32 = 0x00000060;   //  7   127
-const LIQUID_MSEQUENCE_GENPOLY_M8: u32 = 0x000000b8;   //  8   255
-const LIQUID_MSEQUENCE_GENPOLY_M9: u32 = 0x00000110;   //  9   511
-const LIQUID_MSEQUENCE_GENPOLY_M10: u32 = 0x00000240;  // 10   1,023
-const LIQUID_MSEQUENCE_GENPOLY_M11: u32 = 0x00000500;  // 11   2,047
-const LIQUID_MSEQUENCE_GENPOLY_M12: u32 = 0x00000e08;  // 12   4,095
-const LIQUID_MSEQUENCE_GENPOLY_M13: u32 = 0x00001c80;  // 13   8,191
-const LIQUID_MSEQUENCE_GENPOLY_M14: u32 = 0x00003802;  // 14   16,383
-const LIQUID_MSEQUENCE_GENPOLY_M15: u32 = 0x00006000;  // 15   32,767
-const LIQUID_MSEQUENCE_GENPOLY_M16: u32 = 0x0000d008;  // 16   65,535
-const LIQUID_MSEQUENCE_GENPOLY_M17: u32 = 0x00012000;  // 17   131,071
-const LIQUID_MSEQUENCE_GENPOLY_M18: u32 = 0x00020400;  // 18   262,143
-const LIQUID_MSEQUENCE_GENPOLY_M19: u32 = 0x00072000;  // 19   524,287
-const LIQUID_MSEQUENCE_GENPOLY_M20: u32 = 0x00090000;  // 20   1,048,575
-const LIQUID_MSEQUENCE_GENPOLY_M21: u32 = 0x00140000;  // 21   2,097,151
-const LIQUID_MSEQUENCE_GENPOLY_M22: u32 = 0x00300000;  // 22   4,194,303
-const LIQUID_MSEQUENCE_GENPOLY_M23: u32 = 0x00420000;  // 23   8,388,607
-const LIQUID_MSEQUENCE_GENPOLY_M24: u32 = 0x00e10000;  // 24   16,777,215
-const LIQUID_MSEQUENCE_GENPOLY_M25: u32 = 0x01000004;  // 25   33,554,431
-const LIQUID_MSEQUENCE_GENPOLY_M26: u32 = 0x02000023;  // 26   67,108,863
-const LIQUID_MSEQUENCE_GENPOLY_M27: u32 = 0x04000013;  // 27   134,217,727
-const LIQUID_MSEQUENCE_GENPOLY_M28: u32 = 0x08000004;  // 28   268,435,455
-const LIQUID_MSEQUENCE_GENPOLY_M29: u32 = 0x10000002;  // 29   536,870,911
-const LIQUID_MSEQUENCE_GENPOLY_M30: u32 = 0x20000029;  // 30   1,073,741,823
-const LIQUID_MSEQUENCE_GENPOLY_M31: u32 = 0x40000004;  // 31   2,147,483,647
+const MSEQUENCE_GENPOLY_M2: u32 = 0x00000003;   //  2   3
+const MSEQUENCE_GENPOLY_M3: u32 = 0x00000006;   //  3   7
+const MSEQUENCE_GENPOLY_M4: u32 = 0x0000000c;   //  4   15
+const MSEQUENCE_GENPOLY_M5: u32 = 0x00000014;   //  5   31
+const MSEQUENCE_GENPOLY_M6: u32 = 0x00000030;   //  6   63
+const MSEQUENCE_GENPOLY_M7: u32 = 0x00000060;   //  7   127
+const MSEQUENCE_GENPOLY_M8: u32 = 0x000000b8;   //  8   255
+const MSEQUENCE_GENPOLY_M9: u32 = 0x00000110;   //  9   511
+const MSEQUENCE_GENPOLY_M10: u32 = 0x00000240;  // 10   1,023
+const MSEQUENCE_GENPOLY_M11: u32 = 0x00000500;  // 11   2,047
+const MSEQUENCE_GENPOLY_M12: u32 = 0x00000e08;  // 12   4,095
+const MSEQUENCE_GENPOLY_M13: u32 = 0x00001c80;  // 13   8,191
+const MSEQUENCE_GENPOLY_M14: u32 = 0x00003802;  // 14   16,383
+const MSEQUENCE_GENPOLY_M15: u32 = 0x00006000;  // 15   32,767
+const MSEQUENCE_GENPOLY_M16: u32 = 0x0000d008;  // 16   65,535
+const MSEQUENCE_GENPOLY_M17: u32 = 0x00012000;  // 17   131,071
+const MSEQUENCE_GENPOLY_M18: u32 = 0x00020400;  // 18   262,143
+const MSEQUENCE_GENPOLY_M19: u32 = 0x00072000;  // 19   524,287
+const MSEQUENCE_GENPOLY_M20: u32 = 0x00090000;  // 20   1,048,575
+const MSEQUENCE_GENPOLY_M21: u32 = 0x00140000;  // 21   2,097,151
+const MSEQUENCE_GENPOLY_M22: u32 = 0x00300000;  // 22   4,194,303
+const MSEQUENCE_GENPOLY_M23: u32 = 0x00420000;  // 23   8,388,607
+const MSEQUENCE_GENPOLY_M24: u32 = 0x00e10000;  // 24   16,777,215
+const MSEQUENCE_GENPOLY_M25: u32 = 0x01000004;  // 25   33,554,431
+const MSEQUENCE_GENPOLY_M26: u32 = 0x02000023;  // 26   67,108,863
+const MSEQUENCE_GENPOLY_M27: u32 = 0x04000013;  // 27   134,217,727
+const MSEQUENCE_GENPOLY_M28: u32 = 0x08000004;  // 28   268,435,455
+const MSEQUENCE_GENPOLY_M29: u32 = 0x10000002;  // 29   536,870,911
+const MSEQUENCE_GENPOLY_M30: u32 = 0x20000029;  // 30   1,073,741,823
+const MSEQUENCE_GENPOLY_M31: u32 = 0x40000004;  // 31   2,147,483,647
 
 // maximal-length sequence
+#[derive(Debug, Clone, Copy)]
 pub struct MSequence {
     m: u32,     // length generator polynomial, shift register
     g: u32,     // generator polynomial, form: { x^m + ... + 1 }
@@ -52,7 +53,7 @@ impl MSequence {
     //  g      :   generator polynomial, starting with most-significant bit
     //  a      :   initial shift register state, default: 000...001
     pub fn new(m: u32, g: u32, a: u32) -> Result<Self> {
-        if m > LIQUID_MAX_MSEQUENCE_M || m < LIQUID_MIN_MSEQUENCE_M {
+        if m > MAX_MSEQUENCE_M || m < MIN_MSEQUENCE_M {
             return Err(Error::Config(format!("m ({}) not in range", m)));
         }
 
@@ -77,36 +78,36 @@ impl MSequence {
 
     pub fn create_default(m: u32) -> Result<Self> {
         let g = match m {
-            2 => LIQUID_MSEQUENCE_GENPOLY_M2,
-            3 => LIQUID_MSEQUENCE_GENPOLY_M3,
-            4 => LIQUID_MSEQUENCE_GENPOLY_M4,
-            5 => LIQUID_MSEQUENCE_GENPOLY_M5,
-            6 => LIQUID_MSEQUENCE_GENPOLY_M6,
-            7 => LIQUID_MSEQUENCE_GENPOLY_M7,
-            8 => LIQUID_MSEQUENCE_GENPOLY_M8,
-            9 => LIQUID_MSEQUENCE_GENPOLY_M9,
-            10 => LIQUID_MSEQUENCE_GENPOLY_M10,
-            11 => LIQUID_MSEQUENCE_GENPOLY_M11,
-            12 => LIQUID_MSEQUENCE_GENPOLY_M12,
-            13 => LIQUID_MSEQUENCE_GENPOLY_M13,
-            14 => LIQUID_MSEQUENCE_GENPOLY_M14,
-            15 => LIQUID_MSEQUENCE_GENPOLY_M15,
-            16 => LIQUID_MSEQUENCE_GENPOLY_M16,
-            17 => LIQUID_MSEQUENCE_GENPOLY_M17,
-            18 => LIQUID_MSEQUENCE_GENPOLY_M18,
-            19 => LIQUID_MSEQUENCE_GENPOLY_M19,
-            20 => LIQUID_MSEQUENCE_GENPOLY_M20,
-            21 => LIQUID_MSEQUENCE_GENPOLY_M21, 
-            22 => LIQUID_MSEQUENCE_GENPOLY_M22,
-            23 => LIQUID_MSEQUENCE_GENPOLY_M23,
-            24 => LIQUID_MSEQUENCE_GENPOLY_M24,
-            25 => LIQUID_MSEQUENCE_GENPOLY_M25,
-            26 => LIQUID_MSEQUENCE_GENPOLY_M26,
-            27 => LIQUID_MSEQUENCE_GENPOLY_M27,
-            28 => LIQUID_MSEQUENCE_GENPOLY_M28,
-            29 => LIQUID_MSEQUENCE_GENPOLY_M29,
-            30 => LIQUID_MSEQUENCE_GENPOLY_M30,
-            31 => LIQUID_MSEQUENCE_GENPOLY_M31,
+            2 => MSEQUENCE_GENPOLY_M2,
+            3 => MSEQUENCE_GENPOLY_M3,
+            4 => MSEQUENCE_GENPOLY_M4,
+            5 => MSEQUENCE_GENPOLY_M5,
+            6 => MSEQUENCE_GENPOLY_M6,
+            7 => MSEQUENCE_GENPOLY_M7,
+            8 => MSEQUENCE_GENPOLY_M8,
+            9 => MSEQUENCE_GENPOLY_M9,
+            10 => MSEQUENCE_GENPOLY_M10,
+            11 => MSEQUENCE_GENPOLY_M11,
+            12 => MSEQUENCE_GENPOLY_M12,
+            13 => MSEQUENCE_GENPOLY_M13,
+            14 => MSEQUENCE_GENPOLY_M14,
+            15 => MSEQUENCE_GENPOLY_M15,
+            16 => MSEQUENCE_GENPOLY_M16,
+            17 => MSEQUENCE_GENPOLY_M17,
+            18 => MSEQUENCE_GENPOLY_M18,
+            19 => MSEQUENCE_GENPOLY_M19,
+            20 => MSEQUENCE_GENPOLY_M20,
+            21 => MSEQUENCE_GENPOLY_M21, 
+            22 => MSEQUENCE_GENPOLY_M22,
+            23 => MSEQUENCE_GENPOLY_M23,
+            24 => MSEQUENCE_GENPOLY_M24,
+            25 => MSEQUENCE_GENPOLY_M25,
+            26 => MSEQUENCE_GENPOLY_M26,
+            27 => MSEQUENCE_GENPOLY_M27,
+            28 => MSEQUENCE_GENPOLY_M28,
+            29 => MSEQUENCE_GENPOLY_M29,
+            30 => MSEQUENCE_GENPOLY_M30,
+            31 => MSEQUENCE_GENPOLY_M31,
             _ => return Err(Error::Config(format!("m ({}) not in range", m))),
         };
         Self::create_genpoly(g)
@@ -165,7 +166,7 @@ impl MSequence {
 #[cfg(test)]
 mod tests{
     use super::*;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
 
     use crate::sequence::bsequence::BSequence;
 
@@ -197,47 +198,47 @@ mod tests{
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m2)]
+    #[autotest_annotate(autotest_msequence_xcorr_m2)]
     fn test_msequence_xcorr_m2() { msequence_test_autocorrelation(2); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m3)]
+    #[autotest_annotate(autotest_msequence_xcorr_m3)]
     fn test_msequence_xcorr_m3() { msequence_test_autocorrelation(3); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m4)]
+    #[autotest_annotate(autotest_msequence_xcorr_m4)]
     fn test_msequence_xcorr_m4() { msequence_test_autocorrelation(4); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m5)]
+    #[autotest_annotate(autotest_msequence_xcorr_m5)]
     fn test_msequence_xcorr_m5() { msequence_test_autocorrelation(5); }
 
     #[test] 
-    #[liquid_test_annotate(autotest_msequence_xcorr_m6)]
+    #[autotest_annotate(autotest_msequence_xcorr_m6)]
     fn test_msequence_xcorr_m6() { msequence_test_autocorrelation(6); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m7)]
+    #[autotest_annotate(autotest_msequence_xcorr_m7)]
     fn test_msequence_xcorr_m7() { msequence_test_autocorrelation(7); }
     
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m8)]
+    #[autotest_annotate(autotest_msequence_xcorr_m8)]
     fn test_msequence_xcorr_m8() { msequence_test_autocorrelation(8); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m9)]
+    #[autotest_annotate(autotest_msequence_xcorr_m9)]
     fn test_msequence_xcorr_m9() { msequence_test_autocorrelation(9); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m10)]
+    #[autotest_annotate(autotest_msequence_xcorr_m10)]
     fn test_msequence_xcorr_m10() { msequence_test_autocorrelation(10); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m11)]
+    #[autotest_annotate(autotest_msequence_xcorr_m11)]
     fn test_msequence_xcorr_m11() { msequence_test_autocorrelation(11); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_xcorr_m12)]
+    #[autotest_annotate(autotest_msequence_xcorr_m12)]
     fn test_msequence_xcorr_m12() { msequence_test_autocorrelation(12); }
 
     fn msequence_test_period(m: u32) {
@@ -251,127 +252,127 @@ mod tests{
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m2)]
+    #[autotest_annotate(autotest_msequence_period_m2)]
     fn test_msequence_period_m2() { msequence_test_period(2); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m3)]
+    #[autotest_annotate(autotest_msequence_period_m3)]
     fn test_msequence_period_m3() { msequence_test_period(3); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m4)]
+    #[autotest_annotate(autotest_msequence_period_m4)]
     fn test_msequence_period_m4() { msequence_test_period(4); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m5)]
+    #[autotest_annotate(autotest_msequence_period_m5)]
     fn test_msequence_period_m5() { msequence_test_period(5); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m6)]
+    #[autotest_annotate(autotest_msequence_period_m6)]
     fn test_msequence_period_m6() { msequence_test_period(6); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m7)]
+    #[autotest_annotate(autotest_msequence_period_m7)]
     fn test_msequence_period_m7() { msequence_test_period(7); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m8)]
+    #[autotest_annotate(autotest_msequence_period_m8)]
     fn test_msequence_period_m8() { msequence_test_period(8); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m9)]
+    #[autotest_annotate(autotest_msequence_period_m9)]
     fn test_msequence_period_m9() { msequence_test_period(9); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m10)]
+    #[autotest_annotate(autotest_msequence_period_m10)]
     fn test_msequence_period_m10() { msequence_test_period(10); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m11)]
+    #[autotest_annotate(autotest_msequence_period_m11)]
     fn test_msequence_period_m11() { msequence_test_period(11); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m12)]
+    #[autotest_annotate(autotest_msequence_period_m12)]
     fn test_msequence_period_m12() { msequence_test_period(12); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m13)]
+    #[autotest_annotate(autotest_msequence_period_m13)]
     fn test_msequence_period_m13() { msequence_test_period(13); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m14)]
+    #[autotest_annotate(autotest_msequence_period_m14)]
     fn test_msequence_period_m14() { msequence_test_period(14); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m15)]
+    #[autotest_annotate(autotest_msequence_period_m15)]
     fn test_msequence_period_m15() { msequence_test_period(15); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m16)]
+    #[autotest_annotate(autotest_msequence_period_m16)]
     fn test_msequence_period_m16() { msequence_test_period(16); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m17)]
+    #[autotest_annotate(autotest_msequence_period_m17)]
     fn test_msequence_period_m17() { msequence_test_period(17); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m18)]
+    #[autotest_annotate(autotest_msequence_period_m18)]
     fn test_msequence_period_m18() { msequence_test_period(18); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m19)]
+    #[autotest_annotate(autotest_msequence_period_m19)]
     fn test_msequence_period_m19() { msequence_test_period(19); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m20)]
+    #[autotest_annotate(autotest_msequence_period_m20)]
     fn test_msequence_period_m20() { msequence_test_period(20); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m21)]
+    #[autotest_annotate(autotest_msequence_period_m21)]
     fn test_msequence_period_m21() { msequence_test_period(21); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m22)]
+    #[autotest_annotate(autotest_msequence_period_m22)]
     fn test_msequence_period_m22() { msequence_test_period(22); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m23)]
+    #[autotest_annotate(autotest_msequence_period_m23)]
     fn test_msequence_period_m23() { msequence_test_period(23); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m24)]
+    #[autotest_annotate(autotest_msequence_period_m24)]
     fn test_msequence_period_m24() { msequence_test_period(24); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m25)]
+    #[autotest_annotate(autotest_msequence_period_m25)]
     fn test_msequence_period_m25() { msequence_test_period(25); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m26)]
+    #[autotest_annotate(autotest_msequence_period_m26)]
     fn test_msequence_period_m26() { msequence_test_period(26); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m27)]
+    #[autotest_annotate(autotest_msequence_period_m27)]
     fn test_msequence_period_m27() { msequence_test_period(27); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m28)]
+    #[autotest_annotate(autotest_msequence_period_m28)]
     fn test_msequence_period_m28() { msequence_test_period(28); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m29)]
+    #[autotest_annotate(autotest_msequence_period_m29)]
     fn test_msequence_period_m29() { msequence_test_period(29); }
         
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m30)]
+    #[autotest_annotate(autotest_msequence_period_m30)]
     fn test_msequence_period_m30() { msequence_test_period(30); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_period_m31)]
+    #[autotest_annotate(autotest_msequence_period_m31)]
     fn test_msequence_period_m31() { msequence_test_period(31); }
 
     #[test]
-    #[liquid_test_annotate(autotest_msequence_config)]
+    #[autotest_annotate(autotest_msequence_config)]
     fn test_msequence_config() {
         // check invalid configurations
         assert!(MSequence::new(100, 0, 0).is_err());
@@ -379,7 +380,7 @@ mod tests{
         assert!(MSequence::create_genpoly(0).is_err());
 
         // create proper object and test configurations
-        let mut q = MSequence::create_genpoly(LIQUID_MSEQUENCE_GENPOLY_M11).unwrap();
+        let mut q = MSequence::create_genpoly(MSEQUENCE_GENPOLY_M11).unwrap();
 
         assert_eq!(q.get_state(), 1);
         q.set_state(0x8a);

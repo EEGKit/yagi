@@ -1,7 +1,10 @@
 use crate::error::{Error, Result};
 use crate::utility::bits::count_ones;
 use crate::sequence::msequence::MSequence;
+
+
 // binary sequence
+#[derive(Debug, Clone)]
 pub struct BSequence {
     s: Vec<u32>,
     num_bits: usize,
@@ -194,12 +197,12 @@ impl BSequence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
 
     use crate::sequence::msequence::MSequence;
 
     #[test]
-    #[liquid_test_annotate(autotest_bsequence_init)]
+    #[autotest_annotate(autotest_bsequence_init)]
     fn test_bsequence_init() {
         // 1111 0000 1100 1010
         let v = [0xf0u8, 0xcau8];
@@ -231,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_bsequence_init_msequence)]
+    #[autotest_annotate(autotest_bsequence_init_msequence)]
     fn test_bsequence_init_msequence() {
         // create and initialize m-sequence
         let mut ms = MSequence::create_default(4).unwrap();
@@ -244,7 +247,7 @@ mod tests {
 
     
     #[test]
-    #[liquid_test_annotate(autotest_bsequence_correlate)]
+    #[autotest_annotate(autotest_bsequence_correlate)]
     fn test_bsequence_correlate() {
         // v0   :   1111 0000 1100 1010
         // v1   :   1100 1011 0001 1110
@@ -263,7 +266,7 @@ mod tests {
     }
     
     #[test]
-    #[liquid_test_annotate(autotest_bsequence_add)]
+    #[autotest_annotate(autotest_bsequence_add)]
     fn test_bsequence_add() {
         // v0   :   1111 0000 1100 1010
         // v1   :   1100 1011 0001 1110
@@ -304,7 +307,7 @@ mod tests {
     }
     
     #[test]
-    #[liquid_test_annotate(autotest_bsequence_mul)]
+    #[autotest_annotate(autotest_bsequence_mul)]
     fn test_bsequence_mul() {
         // v0   :   1111 0000 1100 1010
         // v1   :   1100 1011 0001 1110
@@ -345,7 +348,7 @@ mod tests {
     }
     
     #[test]
-    #[liquid_test_annotate(autotest_bsequence_accumulate)]
+    #[autotest_annotate(autotest_bsequence_accumulate)]
     fn test_bsequence_accumulate() {
         // 1111 0000 1100 1010 (8 total bits)
         let v = [0xf0u8, 0xcau8];
@@ -387,30 +390,30 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_complementary_code_n8)]
+    #[autotest_annotate(autotest_complementary_code_n8)]
     fn test_complementary_code_n8() { complementary_codes_test(8); }
 
     #[test]
-    #[liquid_test_annotate(autotest_complementary_code_n16)]
+    #[autotest_annotate(autotest_complementary_code_n16)]
     fn test_complementary_code_n16() { complementary_codes_test(16); }
 
     #[test]
-    #[liquid_test_annotate(autotest_complementary_code_n32)]
+    #[autotest_annotate(autotest_complementary_code_n32)]
     fn test_complementary_code_n32() { complementary_codes_test(32); }
 
     #[test]
-    #[liquid_test_annotate(autotest_complementary_code_n64)]
+    #[autotest_annotate(autotest_complementary_code_n64)]
     fn test_complementary_code_n64() { complementary_codes_test(64); }
 
     #[test]
-    #[liquid_test_annotate(autotest_complementary_code_n128)]
+    #[autotest_annotate(autotest_complementary_code_n128)]
     fn test_complementary_code_n128() { complementary_codes_test(128); }
 
     #[test]
-    #[liquid_test_annotate(autotest_complementary_code_n256)]
+    #[autotest_annotate(autotest_complementary_code_n256)]
     fn test_complementary_code_n256() { complementary_codes_test(256); }
 
     #[test]
-    #[liquid_test_annotate(autotest_complementary_code_n512)]
+    #[autotest_annotate(autotest_complementary_code_n512)]
     fn test_complementary_code_n512() { complementary_codes_test(512); }
 }

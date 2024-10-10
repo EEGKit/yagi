@@ -29,6 +29,7 @@ use crate::error::{Error, Result};
 //       extremely large matrices which only have a few non-zero
 //       entries.
 //
+#[derive(Debug, Clone)]
 pub struct SMatrix<T> {
     m: usize,                       // number of rows
     n: usize,                       // number of columns
@@ -482,8 +483,10 @@ impl SMatrix<u8> {
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
+    use test_macro::autotest_annotate;
 
     #[test]
+    #[autotest_annotate(autotest_smatrixf_vmul)]
     fn test_smatrixf_vmul() {
         let tol = 1e-6f32;
 
@@ -511,6 +514,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_smatrixf_mul)]
     fn test_smatrixf_mul() {
         let tol = 1e-6f32;
 
@@ -551,6 +555,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_smatrixb_vmul)]
     fn test_smatrixb_vmul() {
         // Create sparse matrix and set values
         let mut a = SMatrix::<u8>::new(8, 12).unwrap();
@@ -586,6 +591,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_smatrixb_mul)]
     fn test_smatrixb_mul() {
         let a_test: Vec<u8> = vec![
             0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
@@ -639,6 +645,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_smatrixb_mulf)]
     fn test_smatrixb_mulf() {
         let tol = 1e-6f32;
 
@@ -701,6 +708,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_smatrixb_vmulf)]
     fn test_smatrixb_vmulf() {
         let tol = 1e-6f32;
 
@@ -747,6 +755,7 @@ mod tests {
 
 
     #[test]
+    #[autotest_annotate(autotest_smatrixi_vmul)]
     fn test_smatrixi_vmul() {
         // A = [
         //  0 0 0 0 4
@@ -779,6 +788,7 @@ mod tests {
         }
 
     #[test]
+    #[autotest_annotate(autotest_smatrixi_mul)]
     fn test_smatrixi_mul() {
         // initialize matrices
         let mut a = SMatrix::<i16>::new(4, 5).unwrap();

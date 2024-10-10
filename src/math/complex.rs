@@ -5,10 +5,10 @@
 mod tests {
     use approx::assert_relative_eq;
     use num_complex::Complex32;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
 
     #[test]
-    #[liquid_test_annotate(autotest_cexpf)]
+    #[autotest_annotate(autotest_cexpf)]
     fn test_cexpf() {
         let tol = 1e-3f32;
 
@@ -57,7 +57,7 @@ mod tests {
         }
     }
 
-    #[liquid_test_annotate(autotest_clogf)]
+    #[autotest_annotate(autotest_clogf)]
     #[test]
     fn test_clogf() {
         let tol = 1e-3f32;
@@ -107,7 +107,7 @@ mod tests {
         }
     }
 
-    #[liquid_test_annotate(autotest_csqrtf)]
+    #[autotest_annotate(autotest_csqrtf)]
     #[test]
     fn test_csqrtf() {
         let tol = 1e-3f32;
@@ -157,7 +157,7 @@ mod tests {
         }
     }
         
-    #[liquid_test_annotate(autotest_casinf)]
+    #[autotest_annotate(autotest_casinf)]
     #[test]
     fn test_casinf() {
         let tol = 1e-3f32;
@@ -207,7 +207,7 @@ mod tests {
         }
     }
     
-    #[liquid_test_annotate(autotest_cacosf)]
+    #[autotest_annotate(autotest_cacosf)]
     #[test]
     fn test_cacosf() {
         let tol = 1e-3f32;
@@ -258,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_catanf)]
+    #[autotest_annotate(autotest_catanf)]
     fn test_catanf() {
         let tol = 1e-3f32;
 

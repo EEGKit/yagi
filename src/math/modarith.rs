@@ -103,7 +103,6 @@ pub fn unique_factor(n: u32, factors: &mut Vec<u32>) -> Result<usize> {
         return Err(Error::NoConvergence("could not factor number in MAX_FACTORS numbers".to_string()));
     }
 
-    factors.shrink_to_fit();
     Ok(num_factors)
 }
 
@@ -252,10 +251,10 @@ pub fn totient(x: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
 
     #[test]
-    #[liquid_test_annotate(autotest_prime_small)]
+    #[autotest_annotate(autotest_prime_small)]
     fn test_prime_small() {
         for (n, &expected_is_prime) in IS_PRIME_ARRAY.iter().enumerate() {
             assert_eq!(is_prime(n as u32), expected_is_prime != 0);
@@ -263,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_factors)]
+    #[autotest_annotate(autotest_factors)]
     fn test_factors() {
         const FACTORS_280: [u32; 5] = [2, 2, 2, 5, 7];
         const FACTORS_280_UNIQUE: [u32; 3] = [2, 5, 7];
@@ -280,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_totient)]
+    #[autotest_annotate(autotest_totient)]
     fn test_totient() {
         assert_eq!(totient(9), 6);
         assert_eq!(totient(20), 8);
@@ -298,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_gcd_one)]
+    #[autotest_annotate(autotest_gcd_one)]
     fn test_gcd_one() {
         testbench_gcd(1, 2, 3);
         testbench_gcd(1, 2, 5);
@@ -310,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_gcd_edge_cases)]
+    #[autotest_annotate(autotest_gcd_edge_cases)]
     fn test_gcd_edge_cases() {
         testbench_gcd(1, 1, 1);
         testbench_gcd(1, 1, 2);
@@ -320,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_gcd_base)]
+    #[autotest_annotate(autotest_gcd_base)]
     fn test_gcd_base() {
         testbench_gcd(2*2*3*5*7, 2*3, 17);
         testbench_gcd(2*2*3*5*7, 2*3, 17*17);

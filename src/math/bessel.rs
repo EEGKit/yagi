@@ -127,10 +127,10 @@ pub fn besselj0f(z: f32) -> f32 {
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
     
     #[test]
-    #[liquid_test_annotate(autotest_lnbesselif)]
+    #[autotest_annotate(autotest_lnbesselif)]
     fn test_lnbesselif() {
         const EPSILON: f32 = 1e-5;
         assert_relative_eq!(lnbesselif(0.0, 0.0), 0.0, epsilon = EPSILON);
@@ -149,17 +149,17 @@ mod tests {
         assert_relative_eq!(lnbesselif(20.0, 3.0), -34.1194307343208, epsilon = EPSILON);
         assert_relative_eq!(lnbesselif(30.0, 3.0), -62.4217845317278, epsilon = EPSILON);
         // Uncomment these if your implementation can handle these large values
-        // assert_relative_eq!(liquid_lnbesselif(35.0, 3.0), -77.8824494916507, epsilon = EPSILON);
-        // assert_relative_eq!(liquid_lnbesselif(38.0, 3.0), -87.5028737258841, epsilon = EPSILON);
-        // assert_relative_eq!(liquid_lnbesselif(39.0, 3.0), -90.7624095618186, epsilon = EPSILON);
-        // assert_relative_eq!(liquid_lnbesselif(40.0, 3.0), -94.0471931331690, epsilon = EPSILON);
-        // assert_relative_eq!(liquid_lnbesselif(80.0, 3.0), -241.208142562073, epsilon = EPSILON);
-        // assert_relative_eq!(liquid_lnbesselif(140.0, 3.0), -498.439222461430, epsilon = EPSILON);
+        // assert_relative_eq!(lnbesselif(35.0, 3.0), -77.8824494916507, epsilon = EPSILON);
+        // assert_relative_eq!(lnbesselif(38.0, 3.0), -87.5028737258841, epsilon = EPSILON);
+        // assert_relative_eq!(lnbesselif(39.0, 3.0), -90.7624095618186, epsilon = EPSILON);
+        // assert_relative_eq!(lnbesselif(40.0, 3.0), -94.0471931331690, epsilon = EPSILON);
+        // assert_relative_eq!(lnbesselif(80.0, 3.0), -241.208142562073, epsilon = EPSILON);
+        // assert_relative_eq!(lnbesselif(140.0, 3.0), -498.439222461430, epsilon = EPSILON);
         
     }
     
     #[test]
-    #[liquid_test_annotate(autotest_besselif)]
+    #[autotest_annotate(autotest_besselif)]
     fn test_besselif() {
         const EPSILON: f32 = 1e-3;
         assert_relative_eq!(besselif(0.0, 0.0), 1.0, epsilon = EPSILON);
@@ -188,7 +188,7 @@ mod tests {
     }
     
     #[test]
-    #[liquid_test_annotate(autotest_besseli0f)]
+    #[autotest_annotate(autotest_besseli0f)]
     fn test_besseli0f() {
         const EPSILON: f32 = 1e-3;
         assert_relative_eq!(besseli0f(0.0), 1.0, epsilon = EPSILON);
@@ -201,7 +201,7 @@ mod tests {
     }
     
     #[test]
-    #[liquid_test_annotate(autotest_besseljf)]
+    #[autotest_annotate(autotest_besseljf)]
     fn test_besseljf() {
         const EPSILON: f32 = 1e-3;
         assert_relative_eq!(besseljf(0.0, 0.0), 1.000000000000000, epsilon = EPSILON);
@@ -239,7 +239,7 @@ mod tests {
     }
     
     #[test]
-    #[liquid_test_annotate(autotest_besselj0f)]
+    #[autotest_annotate(autotest_besselj0f)]
     fn test_besselj0f() {
         const EPSILON: f32 = 1e-3;
         assert_relative_eq!(besselj0f(0.0), 1.0, epsilon = EPSILON);

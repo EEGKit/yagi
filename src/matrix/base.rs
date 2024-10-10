@@ -12,7 +12,19 @@ impl IsComplex for f32 {
     }
 }
 
+impl IsComplex for f64 {
+    fn is_complex() -> bool {
+        false
+    }
+}
+
 impl IsComplex for Complex<f32> {
+    fn is_complex() -> bool {
+        true
+    }
+}
+
+impl IsComplex for Complex<f64> {
     fn is_complex() -> bool {
         true
     }

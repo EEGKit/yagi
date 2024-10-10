@@ -18,6 +18,7 @@ pub enum WindowType {
 }
 
 // Struct to hold window information
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WindowInfo {
     short_name: &'static str,
     long_name: &'static str,
@@ -65,7 +66,7 @@ pub fn window(window_type: WindowType, i: usize, wlen: usize, arg: f32) -> Resul
         WindowType::Kaiser => kaiser(i, wlen, arg),
         WindowType::FlatTop => flat_top(i, wlen),
         WindowType::Triangular => triangular(i, wlen, arg as usize),
-        WindowType::RcosTaper => rcostaper_window(i, wlen, arg as usize),
+        WindowType::RcosTaper => rcos_taper(i, wlen, arg as usize),
         WindowType::Kbd => kbd(i, wlen, arg),
         WindowType::Unknown => Err(Error::Config("Unknown window type".to_string())),
     }
@@ -167,7 +168,7 @@ pub fn triangular(i: usize, wlen: usize, n: usize) -> Result<f32> {
     Ok(1.0 - (v0 / v1).abs())
 }
 
-pub fn rcostaper_window(i: usize, wlen: usize, t: usize) -> Result<f32> {
+pub fn rcos_taper(i: usize, wlen: usize, t: usize) -> Result<f32> {
     if i > wlen {
         return Err(Error::Value("Raised-cosine taper window: sample index must not exceed window length".to_string()));
     }
@@ -253,7 +254,7 @@ mod tests {
 
     use crate::fft::{Fft, Direction};
     use num_complex::Complex;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
     use approx::assert_relative_eq;
 
     fn window_testbench(window_type: WindowType, n: usize, arg: f32) {
@@ -299,60 +300,60 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_hamming)]
+    #[autotest_annotate(autotest_window_hamming)]
     fn test_window_hamming() {
         window_testbench(WindowType::Hamming, 71, 0.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_hann)]
+    #[autotest_annotate(autotest_window_hann)]
     fn test_window_hann() {
         window_testbench(WindowType::Hann, 71, 0.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_blackmanharris)]
+    #[autotest_annotate(autotest_window_blackmanharris)]
     fn test_window_blackmanharris() {
         window_testbench(WindowType::BlackmanHarris, 71, 0.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_blackmanharris7)]
+    #[autotest_annotate(autotest_window_blackmanharris7)]
     fn test_window_blackmanharris7() {
         window_testbench(WindowType::BlackmanHarris7, 71, 0.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_kaiser)]
+    #[autotest_annotate(autotest_window_kaiser)]
     fn test_window_kaiser() {
         window_testbench(WindowType::Kaiser, 71, 10.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_flattop)]
+    #[autotest_annotate(autotest_window_flattop)]
     fn test_window_flattop() {
         window_testbench(WindowType::FlatTop, 71, 0.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_triangular)]
+    #[autotest_annotate(autotest_window_triangular)]
     fn test_window_triangular() {
         window_testbench(WindowType::Triangular, 71, 71.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_rcostaper)]
+    #[autotest_annotate(autotest_window_rcostaper)]
     fn test_window_rcostaper() {
         window_testbench(WindowType::RcosTaper, 71, 25.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_kbd)]
+    #[autotest_annotate(autotest_window_kbd)]
     fn test_window_kbd() {
         window_testbench(WindowType::Kbd, 72, 0.0);
     }
 
-    fn liquid_kbd_window_test(n: usize, beta: f32) {
+    fn kbd_window_test(n: usize, beta: f32) {
         let tol = 1e-3;
 
         // Compute window
@@ -373,25 +374,25 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_kbd_n16)]
+    #[autotest_annotate(autotest_kbd_n16)]
     fn test_kbd_n16() {
-        liquid_kbd_window_test(16, 10.0);
+        kbd_window_test(16, 10.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_kbd_n32)]
+    #[autotest_annotate(autotest_kbd_n32)]
     fn test_kbd_n32() {
-        liquid_kbd_window_test(32, 20.0);
+        kbd_window_test(32, 20.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_kbd_n48)]
+    #[autotest_annotate(autotest_kbd_n48)]
     fn test_kbd_n48() {
-        liquid_kbd_window_test(48, 12.0);
+        kbd_window_test(48, 12.0);
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_config)]
+    #[autotest_annotate(autotest_window_config)]
     fn test_window_config() {
         assert_eq!(print_windows(), ());
 
@@ -444,7 +445,7 @@ mod tests {
         assert!(triangular(1, 1, 0).is_err()); // Sub-length is zero
 
         // Raised-cosine taper
-        assert!(rcostaper_window(12, 10, 4).is_err()); // Index exceeds maximum
-        assert!(rcostaper_window(7, 10, 8).is_err()); // Taper length exceeds maximum
+        assert!(rcos_taper(12, 10, 4).is_err()); // Index exceeds maximum
+        assert!(rcos_taper(7, 10, 8).is_err()); // Taper length exceeds maximum
     }
 }

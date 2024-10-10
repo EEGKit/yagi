@@ -1,3 +1,9 @@
+// Matrix module
+// Current state:
+// - Autotests matching and passing
+// - ready to use
+// - may rethink later - struct or trait based approach may be interesting
+
 pub mod base;
 pub mod cgsolve;
 pub mod chol;
@@ -29,11 +35,11 @@ mod tests {
     };
     use approx::assert_relative_eq;
     use num_complex::Complex;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
     include!("test_data.rs");
 
     #[test]
-    #[liquid_test_annotate(autotest_matrixf_add)]
+    #[autotest_annotate(autotest_matrixf_add)]
     fn test_matrixf_add() {
         let tol = 1e-6f32;
 
@@ -49,6 +55,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_aug)]
     fn test_matrixf_aug() {
         let tol = 1e-6f32;
 
@@ -64,6 +71,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_cgsolve)]
     fn test_matrixf_cgsolve() {
         let tol = 0.01f32;
 
@@ -79,6 +87,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_chol)]
     fn test_matrixf_chol() {
         let tol = 1e-4f32;
 
@@ -95,6 +104,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_gramschmidt)]
     fn test_matrixf_gramschmidt() {
         let tol = 1e-6f32;
 
@@ -109,6 +119,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_inv)]
     fn test_matrixf_inv() {
         let tol = 1e-6f32;
 
@@ -123,6 +134,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_linsolve)]
     fn test_matrixf_linsolve() {
         let tol = 1e-6f32;
 
@@ -140,6 +152,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_ludecomp_crout)]
     fn test_matrixf_ludecomp_crout() {
         let tol = 1e-6f32;
 
@@ -173,6 +186,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_ludecomp_doolittle)]
     fn test_matrixf_ludecomp_doolittle() {
         let tol = 1e-6f32;
 
@@ -206,6 +220,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_mul)]
     fn test_matrixf_mul() {
         let tol = 1e-6f32;
 
@@ -221,6 +236,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_qrdecomp)]
     fn test_matrixf_qrdecomp() {
         let tol = 1e-4f32; // error tolerance
 
@@ -259,6 +275,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixf_transmul)]
     fn test_matrixf_transmul() {
         let tol = 1e-4f32;
 
@@ -292,6 +309,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_add)]
     fn test_matrixcf_add() {
         let tol: f32 = 1e-6;
         let mut z = [Complex::new(0.0, 0.0); 20];
@@ -305,6 +323,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_aug)]
     fn test_matrixcf_aug() {
         let tol: f32 = 1e-6;
         let mut z = [Complex::new(0.0, 0.0); 35];
@@ -318,6 +337,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_chol)]
     fn test_matrixcf_chol() {
         let tol: f32 = 1e-3;
         let mut l = [Complex::new(0.0, 0.0); 16];
@@ -331,6 +351,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_inv)]
     fn test_matrixcf_inv() {
         let tol: f32 = 1e-6;
         let mut y = MATRIXCF_DATA_INV_X;
@@ -344,6 +365,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_linsolve)]
     fn test_matrixcf_linsolve() {
         let tol = 1e-6f32; // error tolerance
 
@@ -362,6 +384,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_ludecomp_crout)]
     fn test_matrixcf_ludecomp_crout() {
         let tol: f32 = 1e-5;
         let mut l = [Complex::new(0.0, 0.0); 64];
@@ -393,6 +416,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_ludecomp_doolittle)]
     fn test_matrixcf_ludecomp_doolittle() {
         let tol = 1e-5f32; // error tolerance
 
@@ -431,6 +455,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_mul)]
     fn test_matrixcf_mul() {
         let tol: f32 = 1e-6;
         let mut z = [Complex::new(0.0, 0.0); 15];
@@ -444,6 +469,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_qrdecomp)]
     fn test_matrixcf_qrdecomp() {
         let tol = 1e-4f32; // error tolerance
 
@@ -487,6 +513,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_matrixcf_transmul)]
     fn test_matrixcf_transmul() {
         let tol = 1e-4f32; // error tolerance
 

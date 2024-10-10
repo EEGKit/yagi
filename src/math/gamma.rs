@@ -6,7 +6,7 @@ const LOWERGAMMA_MAX_ITERATIONS: usize = 1000;
 /// log(Gamma(z))
 pub fn lngammaf(z: f32) -> f32 {
     if z <= 0.0 {
-        panic!("liquid_lngammaf(), undefined for z <= 0");
+        panic!("lngammaf(), undefined for z <= 0");
     } else if z < 10.0 {
         // Use recursive formula:
         // gamma(z+1) = z * gamma(z)
@@ -33,7 +33,7 @@ pub fn gammaf(z: f32) -> f32 {
         let t0 = gammaf(1.0 - z);
         let t1 = (PI * z).sin();
         if t0 == 0.0 || t1 == 0.0 {
-            panic!("liquid_gammaf(), divide by zero");
+            panic!("gammaf(), divide by zero");
         }
         PI / (t0 * t1)
     } else {
@@ -106,9 +106,10 @@ pub fn factorialf(n: u32) -> f32 {
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
-
+    use test_macro::autotest_annotate;
 
     #[test]
+    #[autotest_annotate(autotest_gamma)]
     fn test_gamma() {
         const EPSILON: f32 = 1e-5;
         let test_vectors: [(f32, f32); 12] = [
@@ -134,6 +135,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_lngamma)]
     fn test_lngamma() {
         const EPSILON: f32 = 1e-4;
         let test_vectors = [
@@ -194,6 +196,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_uppergamma)]
     fn test_uppergamma() {
         const EPSILON: f32 = 1e-3;
         let test_vectors = [
@@ -226,6 +229,7 @@ mod tests {
     }
 
     #[test]
+    #[autotest_annotate(autotest_factorial)]
     fn test_factorial() {
         const EPSILON: f32 = 1e-3;
         let test_vectors = [

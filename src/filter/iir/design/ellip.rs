@@ -1,0 +1,248 @@
+use crate::error::{Error, Result};
+use num_complex::Complex32;
+use std::f32::consts::PI;
+
+// Compute the Landen transformation of _k over _n iterations,
+//  k[n] = (k[n-1] / (1+k'[n-1]))^2
+// where
+//  k'[n-1] = sqrt(1-k[n-1]^2)
+//
+//  _k      :   elliptic modulus
+//  _n      :   number of iterations
+//  _v      :   sequence of decreasing moduli [size: _n]
+pub fn landenf(k: f32, n: usize, v: &mut [f32]) -> Result<()> {
+    let mut k = k;
+    for i in 0..n {
+        let kp = (1.0 - k * k).sqrt();
+        k = (1.0 - kp) / (1.0 + kp);
+        v[i] = k;
+    }
+    Ok(())
+}
+
+// compute elliptic integral K(k) for _n recursions
+//
+//  _k      :   elliptic modulus
+//  _n      :   number of iterations
+//  _K      :   complete elliptic integral (modulus k)
+//  _Kp     :   complete elliptic integral (modulus k')
+pub fn ellipkf(k: f32, n: usize, k_out: &mut f32, kp_out: &mut f32) -> Result<()> {
+    let kmin = 4e-4f32;
+    let kmax = (1.0 - kmin * kmin).sqrt();
+    
+    let kp = (1.0 - k * k).sqrt();
+
+    // Floating point resolution limits the range of the
+    // computation of K on input _k [Orfanidis:2005]
+    if k > kmax {
+        let l = -(0.25 * kp).ln();
+        *k_out = l + 0.25 * (l - 1.0) * kp * kp;
+    } else {
+        let mut v = vec![0.0; n];
+        landenf(k, n, &mut v)?;
+        *k_out = PI * 0.5;
+        for i in 0..n {
+            *k_out *= 1.0 + v[i];
+        }
+    };
+
+    if k < kmin {
+        let l = -(0.25 * k).ln();
+        *kp_out = l + 0.25 * (l - 1.0) * k * k;
+    } else {
+        let mut vp = vec![0.0; n];
+        landenf(kp, n, &mut vp)?;
+        *kp_out = PI * 0.5;
+        for i in 0..n {
+            *kp_out *= 1.0 + vp[i];
+        }
+    }
+
+    Ok(())
+}
+
+// Compute elliptic degree using _n iterations
+//
+//  _N      :   analog filter order
+//  _k1     :   elliptic modulus for stop-band, ep/ep1
+//  _n      :   number of Landen iterations
+pub fn ellipdegf(n: f32, k1_in: f32, n_iter: usize) -> Result<f32> {
+    let mut k1 = k1_in;
+    let mut k1p = k1_in;
+    ellipkf(k1_in, n_iter, &mut k1, &mut k1p)?;
+
+    let q1 = (-PI * k1p / k1).exp();
+    let q = q1.powf(1.0 / n);
+
+    let mut b = 0.0;
+    for m in 0..n_iter {
+        b += q.powf((m * (m + 1)) as f32);
+    }
+    let mut a = 0.0;
+    for m in 1..n_iter {
+        a += q.powf((m * m) as f32);
+    }
+
+    let g = b / (1.0 + 2.0 * a);
+    let k = 4.0 * q.sqrt() * g * g;
+
+    Ok(k)
+}
+
+// complex elliptic cd() function (Jacobian elliptic cosine)
+//
+//  _u      :   vector in the complex u-plane
+//  _k      :   elliptic modulus (0 <= _k < 1)
+//  _n      :   number of Landen iterations (typically 5-6)
+pub fn ellip_cdf(u: Complex32, k: f32, n: usize) -> Complex32 {
+    let mut wn = (u * PI * 0.5).cos();
+    let mut v = vec![0.0; n];
+    landenf(k, n, &mut v).unwrap();
+    for i in (1..=n).rev() {
+        wn = (1.0 + v[i-1]) * wn / (1.0 + v[i-1] * wn * wn);
+    }
+    wn
+}
+
+// complex elliptic sn() function (Jacobian elliptic sine)
+//
+//  _u      :   vector in the complex u-plane
+//  _k      :   elliptic modulus (0 <= _k < 1)
+//  _n      :   number of Landen iterations (typically 5-6)
+pub fn ellip_snf(u: Complex32, k: f32, n: usize) -> Complex32 {
+    let mut wn = (u * PI * 0.5).sin();
+    let mut v = vec![0.0; n];
+    landenf(k, n, &mut v).unwrap();
+    for i in (1..=n).rev() {
+        wn = (1.0 + v[i-1]) * wn / (1.0 + v[i-1] * wn * wn);
+    }
+    wn
+}
+
+// complex elliptic acdf() function (Jacobian elliptic arc cosine)
+//
+//  _w      :   vector in the complex u-plane
+//  _k      :   elliptic modulus (0 <= _k < 1)
+//  _n      :   number of Landen iterations (typically 5-6)
+pub fn ellip_acdf(w: Complex32, k: f32, n: usize) -> Complex32 {
+    let mut v = vec![0.0; n];
+    landenf(k, n, &mut v).unwrap();
+
+    let mut w = w;
+    for i in 0..n {
+        let v1 = if i == 0 { k } else { v[i-1] };
+        w = w / (1.0 + (1.0 - w * w * v1 * v1).sqrt()) * 2.0 / (1.0 + v[i]);
+    }
+
+    let u = w.acos() * 2.0 / PI;
+    u
+}
+
+// complex elliptic asnf() function (Jacobian elliptic arc sine)
+pub fn ellip_asnf(w: Complex32, k: f32, n: usize) -> Complex32 {
+    Complex32::new(1.0, 0.0) - ellip_acdf(w, k, n)
+}
+
+// Compute analog zeros, poles, gain of low-pass elliptic
+// filter, grouping complex conjugates together. If
+// the filter order is odd, the single real pole is at the
+// end of the array.
+//  _n      :   filter order
+//  _ep     :   epsilon_p, related to pass-band ripple
+//  _es     :   epsilon_s, related to stop-band ripple
+//  _za     :   output analog zeros [length: floor(_n/2)]
+//  _pa     :   output analog poles [length: _n]
+//  _ka     :   output analog gain
+pub fn iir_design_ellip_analog(
+    n: usize,
+    ep: f32,
+    es: f32,
+    za: &mut Vec<Complex32>,
+    pa: &mut Vec<Complex32>,
+    ka: &mut Complex32,
+) -> Result<()> {
+    let fp = 1.0 / (2.0 * PI);  // pass-band cutoff
+    let fs = 1.1 * fp;          // stop-band cutoff
+
+    let n_iter = 7;
+
+    let wp = 2.0 * PI * fp;
+    let ws = 2.0 * PI * fs;
+
+    // ripples passband, stopband
+    let ep = ep;
+    let es = es;
+
+    let k = wp / ws;
+    let k1 = ep / es;
+
+    let mut k_ellip = 0.0;
+    let mut k1_ellip = 0.0;
+    let mut kp = 0.0;
+    let mut k1p = 0.0;
+
+    ellipkf(k, n_iter, &mut k_ellip, &mut kp)?;
+    ellipkf(k1, n_iter, &mut k1_ellip, &mut k1p)?;
+
+    let n = n as f32;
+
+    let k = ellipdegf(n, k1, n_iter)?;
+
+    let l = (n / 2.0).floor() as usize;
+    let r = (n as usize) % 2;
+    let mut u = vec![0.0; l];
+    for i in 0..l {
+        let t = (i + 1) as f32;
+        u[i] = (2.0 * t - 1.0) / n;
+    }
+    let mut zeta = vec![Complex32::new(0.0, 0.0); l];
+    for i in 0..l {
+        zeta[i] = ellip_cdf(Complex32::new(u[i], 0.0), k, n_iter);
+    }
+    let mut za_tmp = vec![Complex32::new(0.0, 0.0); l];
+    for i in 0..l {
+        za_tmp[i] = Complex32::new(0.0, 1.0) * wp / (k * zeta[i]);
+    }
+    let v0 = -Complex32::new(0.0, 1.0) * ellip_asnf(Complex32::new(0.0, 1.0) / ep, k1, n_iter) / n;
+
+    let mut pa_tmp = vec![Complex32::new(0.0, 0.0); l];
+    for i in 0..l {
+        pa_tmp[i] = wp * Complex32::new(0.0, 1.0) * ellip_cdf(Complex32::new(u[i], 0.0) - Complex32::new(0.0, 1.0) * v0, k, n_iter);
+    }
+    let pa0 = wp * Complex32::new(0.0, 1.0) * ellip_snf(Complex32::new(0.0, 1.0) * v0, k, n_iter);
+
+    za.clear();
+    pa.clear();
+
+    for i in 0..l {
+        pa.push(pa_tmp[i]);
+        pa.push(pa_tmp[i].conj());
+    }
+
+    if r != 0 {
+        pa.push(pa0);
+    }
+
+    if pa.len() != n as usize {
+        return Err(Error::Internal("Invalid derived order (poles)".into()));
+    }
+
+    for i in 0..l {
+        za.push(za_tmp[i]);
+        za.push(za_tmp[i].conj());
+    }
+
+    if za.len() != 2 * l {
+        return Err(Error::Internal("Invalid derived order (zeros)".into()));
+    }
+
+    *ka = if r == 1 { Complex32::new(1.0, 0.0) } else { Complex32::new(1.0 / (1.0 + ep * ep).sqrt(), 0.0) };
+    for i in 0..n as usize {
+        *ka *= pa[i];
+    }
+    for i in 0..2 * l {
+        *ka /= za[i];
+    }
+
+    Ok(())
+}

@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Window<T> {
     v: Vec<T>,
     len: usize,
@@ -10,7 +10,7 @@ pub struct Window<T> {
 }
 
 impl<T: Default + Clone + Copy> Window<T> {
-    pub fn create(n: usize) -> Result<Self> {
+    pub fn new(n: usize) -> Result<Self> {
         if n == 0 {
             return Err(Error::Config("window size must be greater than zero".to_string()));
         }
@@ -32,12 +32,12 @@ impl<T: Default + Clone + Copy> Window<T> {
         Ok(window)
     }
 
-    pub fn recreate(&mut self, n: usize) -> Result<()> {
+    pub fn resize(&mut self, n: usize) -> Result<()> {
         if n == self.len {
             return Ok(());
         }
 
-        let mut new_window = Window::create(n)?;
+        let mut new_window = Window::new(n)?;
 
         if n > self.len {
             // New buffer is larger; push zeros, then old values
@@ -91,33 +91,23 @@ impl<T: Default + Clone + Copy> Window<T> {
     }
 }
 
-impl<T: Default + Clone> Clone for Window<T> {
-    fn clone(&self) -> Self {
-        Window {
-            v: self.v.clone(),
-            ..*self
-        }
-    }
-}
-
-// ... (previous code remains unchanged)
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use num_complex::Complex;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
     use approx::assert_relative_eq;
 
     #[test]
-    #[liquid_test_annotate(autotest_window_config_errors)]
+    #[autotest_annotate(autotest_window_config_errors)]
     fn test_window_config_errors() {
-        assert!(Window::<f32>::create(0).is_err());
-        assert!(Window::<Complex<f32>>::create(0).is_err());
+        assert!(Window::<f32>::new(0).is_err());
+        assert!(Window::<Complex<f32>>::new(0).is_err());
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_windowf)]
+    #[autotest_annotate(autotest_windowf)]
     fn test_windowf() {
         let v = [9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0, 0.0];
         let test0 = [0.0; 10];
@@ -131,7 +121,7 @@ mod tests {
         let test8 = [0.0; 10];
 
         // create window
-        let mut w = Window::<f32>::create(10).unwrap();
+        let mut w = Window::<f32>::new(10).unwrap();
 
         assert_eq!(w.read(), &test0);
 
@@ -178,7 +168,7 @@ mod tests {
         assert_eq!(w.read(), &test4);
 
         // recreate window (truncate to last 6 elements)
-        w.recreate(6).unwrap();
+        w.resize(6).unwrap();
         assert_eq!(w.read(), &test5);
 
         // push 2 more elements
@@ -187,7 +177,7 @@ mod tests {
         assert_eq!(w.read(), &test6);
 
         // recreate window (extend to 10 elements)
-        w.recreate(10).unwrap();
+        w.resize(10).unwrap();
         assert_eq!(w.read(), &test7);
 
         // reset
@@ -196,10 +186,10 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_window_copy)]
+    #[autotest_annotate(autotest_window_copy)]
     fn test_window_copy() {
         let wlen = 20;
-        let mut q0 = Window::<Complex<f32>>::create(wlen).unwrap();
+        let mut q0 = Window::<Complex<f32>>::new(wlen).unwrap();
 
         // write some values
         // TODO maybe replace with randnf()

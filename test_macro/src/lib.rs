@@ -3,7 +3,7 @@ extern crate quote;
 use proc_macro::*;
 
 #[proc_macro_attribute]
-pub fn liquid_test_annotate(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn autotest_annotate(attr: TokenStream, item: TokenStream) -> TokenStream {
     // let input = syn::parse_macro_input!(i as syn::ItemFn);
     let mut i: syn::Item = syn::parse(item).unwrap();
     let fn_item = match &mut i {

@@ -7,15 +7,21 @@ use std::f32::consts::PI;
 // order is odd, the single real pole (-1) is at the end of
 // the array.  There are no zeros for the analog Butterworth
 // filter.  The gain is unity.
-pub fn butter_azpkf(n: usize) -> Result<(Vec<Complex32>, Vec<Complex32>, Complex32)> {
+pub fn iir_design_butter_analog(
+    n: usize,
+    za: &mut Vec<Complex32>,
+    pa: &mut Vec<Complex32>,
+    ka: &mut Complex32
+) -> Result<()> {
     if n == 0 {
         return Err(Error::Config("filter order must be greater than zero".to_string()));
     }
 
     let r = n % 2;
     let l = (n - r) / 2;
-    
-    let mut pa = Vec::with_capacity(n);
+
+    za.clear();
+    pa.clear();
     
     for i in 0..l {
         let theta = (2.0 * (i as f32 + 1.0) + n as f32 - 1.0) * PI / (2.0 * n as f32);
@@ -31,7 +37,8 @@ pub fn butter_azpkf(n: usize) -> Result<(Vec<Complex32>, Vec<Complex32>, Complex
         return Err(Error::Internal("filter order mismatch".to_string()));
     }
 
-    Ok((Vec::new(), pa, Complex32::new(1.0, 0.0)))
+    *ka = Complex32::new(1.0, 0.0);
+    Ok(())
 }
 
 #[cfg(test)]
@@ -43,7 +50,10 @@ mod tests {
     fn test_butter_azpkf() {
         // test odd/even filter orders
         for n in 1..=10 {
-            let (za, pa, ka) = butter_azpkf(n).unwrap();
+            let mut za = vec![Complex32::new(0.0, 0.0); 0];
+            let mut pa = vec![Complex32::new(0.0, 0.0); n];
+            let mut ka = Complex32::new(0.0, 0.0);
+            iir_design_butter_analog(n, &mut za, &mut pa, &mut ka).unwrap();
 
             // check lengths
             assert_eq!(za.len(), 0);

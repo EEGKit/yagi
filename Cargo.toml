@@ -7,15 +7,16 @@ description = "Batteries-included DSP library"
 license = "MIT"
 
 [profile.dev]
-opt-level = 2
+opt-level = 1
 
 [profile.test]
-opt-level = 2
+opt-level = 1
 
 [dependencies]
 libm = "0.2.8"
 num-complex = "0.4.6"
 num-traits = "0.2.19"
+rand = "0.8.5"
 rustfft = "6.2.0"
 
 [dev-dependencies]

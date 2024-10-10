@@ -114,10 +114,10 @@ pub fn msb_index(x: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_macro::liquid_test_annotate;
+    use test_macro::autotest_annotate;
 
     #[test]
-    #[liquid_test_annotate(autotest_count_ones)]
+    #[autotest_annotate(autotest_count_ones)]
     fn test_count_ones() {
         assert_eq!(count_ones(0x0000), 0);
         assert_eq!(count_ones(0x0001), 1);
@@ -132,7 +132,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_count_ones_mod2)]
+    #[autotest_annotate(autotest_count_ones_mod2)]
     fn test_count_ones_mod2() {
         assert_eq!(count_ones_mod2(0x0000), 0);
         assert_eq!(count_ones_mod2(0x0001), 1);
@@ -147,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_bdotprod)]
+    #[autotest_annotate(autotest_bdotprod)]
     fn test_bdotprod() {
         // simple checks
         assert_eq!(bdotprod(0x1111, 0x1111), 0);
@@ -175,7 +175,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_count_leading_zeros)]
+    #[autotest_annotate(autotest_count_leading_zeros)]
     fn test_count_leading_zeros() {
         // NOTE: this test assumes a 4-byte integer
         assert_eq!(count_leading_zeros(0x00000000), 32);
@@ -222,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    #[liquid_test_annotate(autotest_msb_index)]
+    #[autotest_annotate(autotest_msb_index)]
     fn test_msb_index() {
         // NOTE: this test assumes a 4-byte integer
         assert_eq!(msb_index(0x00000000),  0);
