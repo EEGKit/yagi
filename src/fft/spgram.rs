@@ -431,7 +431,7 @@ impl<T: Copy + Default + From<f32> + Zero + Mul<Output = T> > Spgram<T> where Co
     fn test_spgramcf_noise_kbd() { testbench_spgramcf_noise(800, 0, 0, WindowType::Kbd, -80.0); }   
 
     fn testbench_spgramcf_signal(nfft: usize, wtype: WindowType, fc: f32, snr_db: f32) {
-        use crate::filter::fir::design::FirdesFilterType;
+        use crate::filter::FirFilterType;
         use crate::framing::symstreamr::SymStreamR;
         use crate::modem::modem::ModulationScheme;
         use crate::utility::test_helpers::{PsdRegion, validate_psd_spectrum};
@@ -447,7 +447,7 @@ impl<T: Copy + Default + From<f32> + Zero + Mul<Output = T> > Spgram<T> where Co
         // create objects
         let mut q = Spgram::<Complex32>::new(nfft, wtype, nfft/2, nfft/4).unwrap();
         let mut gen = SymStreamR::new_linear(
-            FirdesFilterType::Kaiser,
+            FirFilterType::Kaiser,
             bw,
             m,
             beta,

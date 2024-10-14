@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::buffer::{Window, WDelay};
-use crate::filter::fir::design;
+use crate::filter;
 use num_complex::ComplexFloat;
 
 #[derive(Clone, Debug)]
@@ -49,7 +49,7 @@ where
     }
 
     pub fn new_rnyquist(
-        filter_type: design::FirdesFilterType,
+        filter_type: filter::FirFilterType,
         k: usize,
         m: usize,
         beta: f32,
@@ -69,7 +69,7 @@ where
         }
 
         let h_len = 2 * k * m + 1;
-        let h = design::fir_design_prototype(filter_type, k, m, beta, dt)?;
+        let h = filter::fir_design_prototype(filter_type, k, m, beta, dt)?;
         let hc: Vec<T> = h.iter().map(|&x| (x / k as f32).into() ).collect();
 
         Self::new(Some(&hc), h_len)
@@ -83,7 +83,7 @@ where
             return Err(Error::Config("filter cutoff must be in (0,0.5]".into()));
         }
 
-        let h = design::kaiser::fir_design_kaiser(h_len, fc, 40.0, 0.0)?;
+        let h = filter::fir_design_kaiser(h_len, fc, 40.0, 0.0)?;
         let hc: Vec<T> = h.iter().map(|&x| x * 2.0.into() * fc).collect();
 
         Self::new(Some(&hc), h_len)
@@ -203,8 +203,7 @@ where
 mod tests {
     use super::*;
     use test_macro::autotest_annotate;
-    use crate::filter::fir::firinterp::FirInterp;
-    use crate::filter::fir::firfilt::FirFilt;
+    use crate::filter::{FirInterp, FirFilt, FirFilterType};
     use crate::math::{sincf, hamming};
     use crate::modem::modem::{Modem, ModulationScheme};
     use crate::random::randnf;
@@ -224,7 +223,7 @@ mod tests {
     ) {
         //let tol = 0.025f32; // error tolerance
         let mut mod_ = Modem::new(ms).unwrap();
-        let mut interp = FirInterp::<Complex<f32>, f32>::new_prototype(design::FirdesFilterType::Arkaiser, k, m, beta, 0.0).unwrap();
+        let mut interp = FirInterp::<Complex<f32>, f32>::new_prototype(FirFilterType::Arkaiser, k, m, beta, 0.0).unwrap();
 
         // create fixed channel filter
         let h = [
@@ -247,7 +246,7 @@ mod tests {
 
         // create and initialize equalizer
         let mut eq = match init {
-            0 => Eqlms::<Complex<f32>>::new_rnyquist(design::FirdesFilterType::Arkaiser, k, p, beta, 0.0),
+            0 => Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, k, p, beta, 0.0),
             1 => Eqlms::<Complex<f32>>::new_lowpass(2 * k * p + 1, 0.5 / (k as f32)),
             2 => Eqlms::<Complex<f32>>::new(Some(&hp), 2 * k * p + 1),
             _ => Eqlms::<Complex<f32>>::new(None, 2 * k * p + 1),
@@ -385,10 +384,10 @@ mod tests {
     #[autotest_annotate(autotest_eqlms_config)]
     fn autotest_eqlms_config() {
         // check that object returns None for invalid configurations
-        assert!(Eqlms::<Complex<f32>>::new_rnyquist(design::FirdesFilterType::Arkaiser, 0, 12, 0.3, 0.0).is_err());
-        assert!(Eqlms::<Complex<f32>>::new_rnyquist(design::FirdesFilterType::Arkaiser, 2, 0, 0.3, 0.0).is_err());
-        assert!(Eqlms::<Complex<f32>>::new_rnyquist(design::FirdesFilterType::Arkaiser, 2, 12, 2.0, 0.0).is_err());
-        assert!(Eqlms::<Complex<f32>>::new_rnyquist(design::FirdesFilterType::Arkaiser, 2, 12, 0.3, -2.0).is_err());
+        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, 0, 12, 0.3, 0.0).is_err());
+        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, 2, 0, 0.3, 0.0).is_err());
+        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, 2, 12, 2.0, 0.0).is_err());
+        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, 2, 12, 0.3, -2.0).is_err());
 
         assert!(Eqlms::<Complex<f32>>::new_lowpass(0, 0.1).is_err());
         assert!(Eqlms::<Complex<f32>>::new_lowpass(13, -0.1).is_err());

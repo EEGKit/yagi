@@ -12,7 +12,7 @@ use std::f32::consts::PI;
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `h`      : output coefficient buffer (length: 2*k*m+1)
+/// * `Vec<f32>` : output coefficient buffer (length: 2*k*m+1)
 pub fn fir_design_rcos(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     if k < 1 {
         return Err(Error::Config("k must be greater than 0".into()));

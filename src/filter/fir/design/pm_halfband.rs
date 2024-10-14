@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::filter::fir::design::estimate_req_filter_transition_bandwidth;
-use crate::filter::fir::design::pm::{fir_design_pm, BandType, WeightType};
+use crate::filter::fir::design::pm::{fir_design_pm, FirPmBandType, FirPmWeightType};
 use crate::fft::{Fft, Direction};
 use crate::optim::qs1dsearch::{Qs1dSearch, OptimDirection};
 
@@ -52,8 +52,8 @@ fn firdespm_halfband_utility(gamma: f32, userdata: &mut Option<&mut dyn std::any
     let bands = [0.00, f0, f1, 0.50];
     let des = [1.0, 0.0];
     let weights = [1.0, 1.0]; // best with {1, 1}
-    let wtype = [WeightType::Flat, WeightType::Flat]; // best with {flat, flat}
-    let h = fir_design_pm(userdata.h_len, 2, &bands, &des, Some(&weights), Some(&wtype), BandType::Bandpass)
+    let wtype = [FirPmWeightType::Flat, FirPmWeightType::Flat]; // best with {flat, flat}
+    let h = fir_design_pm(userdata.h_len, 2, &bands, &des, Some(&weights), Some(&wtype), FirPmBandType::Bandpass)
         .expect("firdespm_run failed");
     userdata.h = h;
 
@@ -87,7 +87,15 @@ fn firdespm_halfband_utility(gamma: f32, userdata: &mut Option<&mut dyn std::any
     10.0 * (u / userdata.n as f32).log10()
 }
 
-/// Perform search to find optimal coefficients given transition band
+/// Design halfband filter using Parks-McClellan algorithm given the
+/// filter length and desired transition band
+///
+/// # Arguments
+/// * `m` : filter semi-length
+/// * `ft` : desired transition band
+///
+/// # Returns
+/// * `Vec<f32>` : filter coefficients
 pub fn fir_design_pm_halfband_ft(m: usize, ft: f32) -> Result<Vec<f32>> {
     // create and initialize object
     let mut q = FirdespmHalfband::new(m, 4 * m + 1, 1200, ft)?;
@@ -108,7 +116,15 @@ pub fn fir_design_pm_halfband_ft(m: usize, ft: f32) -> Result<Vec<f32>> {
     Ok(q.h)
 }
 
-/// Perform search to find optimal coefficients given stop-band suppression
+/// Design halfband filter using Parks-McClellan algorithm given the
+/// filter length and desired stop-band suppression
+///
+/// # Arguments
+/// * `m` : filter semi-length
+/// * `as_` : desired stop-band suppression
+///
+/// # Returns
+/// * `Vec<f32>` : filter coefficients
 pub fn fir_design_pm_halfband_stopband_attenuation(m: usize, as_: f32) -> Result<Vec<f32>> {
     // estimate transition band given other parameters
     let ft = estimate_req_filter_transition_bandwidth(as_, 4 * m + 1)?;

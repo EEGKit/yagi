@@ -180,7 +180,7 @@ where
 mod tests {
     use super::*;
     use test_macro::autotest_annotate;
-    use crate::filter::fir::firfilt::FirFilt;
+    use crate::filter::FirFilt;
     use crate::random::randnf;
     use approx::assert_relative_eq;
 

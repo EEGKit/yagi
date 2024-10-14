@@ -3,7 +3,7 @@ use num_complex::Complex;
 use crate::error::{Error, Result};
 use crate::fft::{fft_run, Direction};
 use crate::fft::spgram::Spgram;
-use crate::filter::fir::firfilt::FirFilt;
+use crate::filter::FirFilt;
 use crate::filter::iir::iirfilt::IirFilt;
 use crate::math::nextpow2;
 

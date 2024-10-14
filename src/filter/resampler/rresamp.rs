@@ -1,7 +1,6 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::fir::firpfb::FirPfb;
-use crate::filter::fir::design::{self, FirdesFilterType};
+use crate::filter::{self, FirPfb, FirFilterType};
 use crate::math::gcd;
 
 use num_complex::ComplexFloat;
@@ -60,7 +59,7 @@ where
         };
 
         let h_len = 2 * interp * m + 1;
-        let hf = design::kaiser::fir_design_kaiser(h_len, bw / interp as f32, as_, 0.0)?;
+        let hf = filter::fir_design_kaiser(h_len, bw / interp as f32, as_, 0.0)?;
 
         let h: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
 
@@ -71,14 +70,14 @@ where
         Ok(q)
     }
 
-    pub fn new_prototype(ftype: FirdesFilterType, interp: usize, decim: usize, m: usize, beta: f32) -> Result<Self> {
+    pub fn new_prototype(ftype: FirFilterType, interp: usize, decim: usize, m: usize, beta: f32) -> Result<Self> {
         let gcd = gcd(interp as u32, decim as u32)? as usize;
         let interp = interp / gcd;
         let decim = decim / gcd;
 
         let decim_flag = interp < decim;
         let k = if decim_flag { decim } else { interp };
-        let hf = design::fir_design_prototype(ftype, k, m, beta, 0.0)?;
+        let hf = filter::fir_design_prototype(ftype, k, m, beta, 0.0)?;
 
         let h: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
 
@@ -279,7 +278,7 @@ mod tests {
             "baseline" => Rresamp::<Complex32, f32>::new_kaiser(interp, decim, m, bw, as_).unwrap(),
             "default" => Rresamp::<Complex32, f32>::new_default(interp, decim).unwrap(),
             _ => {
-                let ftype = design::getopt_str2firfilt(method).unwrap();
+                let ftype = FirFilterType::from_str(method).unwrap();
                 let beta = bw; // rename to avoid confusion
                 Rresamp::<Complex32, f32>::new_prototype(ftype, interp, decim, m, beta).unwrap()
             }
@@ -290,7 +289,7 @@ mod tests {
         // create and configure objects
         let bw = 0.2f32; // target output bandwidth
         let mut q   = Spgram::<Complex32>::new(nfft, WindowType::Hann, nfft/2, nfft/4).unwrap();
-        let mut gen = SymStreamR::new_linear(FirdesFilterType::Kaiser, r*bw, 25, 0.2, ModulationScheme::Qpsk).unwrap();
+        let mut gen = SymStreamR::new_linear(FirFilterType::Kaiser, r*bw, 25, 0.2, ModulationScheme::Qpsk).unwrap();
         gen.set_gain((bw*r).sqrt());
 
         // generate samples and push through spgram object

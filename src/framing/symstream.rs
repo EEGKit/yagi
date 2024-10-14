@@ -1,12 +1,11 @@
 use crate::error::{Error, Result};
-use crate::filter::fir::firinterp::FirInterp;
+use crate::filter::{FirInterp, FirFilterType};
 use crate::modem::modem::{Modem, ModulationScheme};
-use crate::filter::fir::design::FirdesFilterType;
 use num_complex::Complex32;
 
 #[derive(Clone, Debug)]
 pub struct SymStream {
-    filter_type: FirdesFilterType,
+    filter_type: FirFilterType,
     k: usize,
     m: usize,
     beta: f32,
@@ -19,11 +18,11 @@ pub struct SymStream {
 
 impl SymStream {
     pub fn new() -> Result<Self> {
-        Self::new_linear(FirdesFilterType::Arkaiser, 2, 7, 0.3, ModulationScheme::Qpsk)
+        Self::new_linear(FirFilterType::Arkaiser, 2, 7, 0.3, ModulationScheme::Qpsk)
     }
 
     pub fn new_linear(
-        ftype: FirdesFilterType,
+        ftype: FirFilterType,
         k: usize,
         m: usize,
         beta: f32,
@@ -65,7 +64,7 @@ impl SymStream {
         self.buf_index = 0;
     }
 
-    pub fn get_ftype(&self) -> FirdesFilterType {
+    pub fn get_ftype(&self) -> FirFilterType {
         self.filter_type
     }
 
@@ -132,7 +131,7 @@ mod tests {
 
     fn testbench_symstreamcf_delay(k: usize, m: usize) {
         // create object and get expected delay
-        let ftype = FirdesFilterType::Arkaiser;
+        let ftype = FirFilterType::Arkaiser;
         let beta = 0.30;
         let ms = ModulationScheme::Qpsk;
         let mut gen = SymStream::new_linear(ftype, k, m, beta, ms).unwrap();
@@ -238,7 +237,7 @@ mod tests {
 
     fn testbench_symstreamcf_psd(k: usize, m: usize, beta: f32) {
         // create object
-        let ftype = FirdesFilterType::Arkaiser;
+        let ftype = FirFilterType::Arkaiser;
         let ms = ModulationScheme::Qpsk;
         let mut gen = SymStream::new_linear(ftype, k, m, beta, ms).unwrap();
         gen.set_gain(1.0 / (k as f32).sqrt());
@@ -306,7 +305,7 @@ mod tests {
     fn test_symstreamcf_copy() {
         // create objects
         let mut gen_orig = SymStream::new_linear(
-            FirdesFilterType::Arkaiser,
+            FirFilterType::Arkaiser,
             5,
             17,
             0.27,

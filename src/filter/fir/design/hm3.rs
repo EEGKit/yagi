@@ -16,7 +16,7 @@ use crate::filter::fir::design;
 /// * `dt`     : filter fractional sample delay
 ///
 /// # Returns
-/// * `h`      : resulting filter [size: 2*k*m+1]
+/// * `Vec<f32>` : filter coefficients
 pub fn fir_design_hm3(k: usize, m: usize, beta: f32, _dt: f32) -> Result<Vec<f32>> {
     if k < 2 {
         return Err(Error::Config("k must be greater than 1".into()));
@@ -40,11 +40,11 @@ pub fn fir_design_hm3(k: usize, m: usize, beta: f32, _dt: f32) -> Result<Vec<f32
     let des = [1.0, 1.0 / 2.0_f32.sqrt(), 0.0];
     let weights = [1.0, 1.0, 1.0];
 
-    let btype = design::pm::BandType::Bandpass;
+    let btype = design::pm::FirPmBandType::Bandpass;
     let wtype = [
-        design::pm::WeightType::Flat,
-        design::pm::WeightType::Flat,
-        design::pm::WeightType::Exp,
+        design::pm::FirPmWeightType::Flat,
+        design::pm::FirPmWeightType::Flat,
+        design::pm::FirPmWeightType::Exp,
     ];
 
     let mut h = vec![0.0; n];

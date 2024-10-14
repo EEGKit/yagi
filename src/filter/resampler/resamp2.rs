@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::fir::design;
+use crate::filter;
 use crate::buffer::Window;
 use std::f32::consts::PI;
 
@@ -54,7 +54,7 @@ where
 
         let h_len = 4 * m + 1;
         let mut h = vec![Coeff::zero(); h_len];
-        let hf = design::pm_halfband::fir_design_pm_halfband_stopband_attenuation(m, as_)?;
+        let hf = filter::fir_design_pm_halfband_stopband_attenuation(m, as_)?;
 
         for (i, hi) in h.iter_mut().enumerate() {
             let t = i as f32 - (h_len - 1) as f32 / 2.0;
@@ -288,7 +288,7 @@ mod tests {
         }
 
         // compute expected transition band (extend slightly for relaxed constraints)
-        let ft = design::estimate_req_filter_transition_bandwidth(as_, h_len).unwrap() * 1.1;
+        let ft = filter::estimate_req_filter_transition_bandwidth(as_, h_len).unwrap() * 1.1;
 
         // verify low-pass frequency response
         let regions_h0 = vec![

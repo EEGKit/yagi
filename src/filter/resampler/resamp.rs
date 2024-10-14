@@ -1,7 +1,6 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::fir::firpfb::FirPfb;
-use crate::filter::fir::design;
+use crate::filter::{self, FirPfb};
 use crate::math::nextpow2;
 
 use num_complex::ComplexFloat;
@@ -45,7 +44,7 @@ where
 
         // design filter
         let n = 2 * m * npfb + 1;
-        let hf = design::kaiser::fir_design_kaiser(n, fc / (npfb as f32), as_, 0.0)?;
+        let hf = filter::fir_design_kaiser(n, fc / (npfb as f32), as_, 0.0)?;
 
         // normalize filter coefficients by DC gain
         let gain = hf.iter().sum::<f32>();
@@ -188,7 +187,7 @@ mod tests {
         // generate pulse with sharp transition and very narrow side-lobes
         let p = (40.0 / r) as usize;
         let pulse_len = 4 * p + 1;
-        let pulse = design::kaiser::fir_design_kaiser(pulse_len, 0.5 * r * bw, 120.0, 0.0).unwrap();
+        let pulse = filter::fir_design_kaiser(pulse_len, 0.5 * r * bw, 120.0, 0.0).unwrap();
 
         // allocate buffers and copy input
         let num_input = pulse_len + 2 * m + 1;

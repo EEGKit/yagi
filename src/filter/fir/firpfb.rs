@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::buffer::Window;
 use crate::dotprod::DotProd;
-use super::design;
+use crate::filter;
 
 use num_complex::ComplexFloat;
 
@@ -71,13 +71,13 @@ where
         }
 
         let h_len = 2 * num_filters * m + 1;
-        let hf = design::kaiser::fir_design_kaiser(h_len, fc / num_filters as f32, as_, 0.0)?;
+        let hf = filter::fir_design_kaiser(h_len, fc / num_filters as f32, as_, 0.0)?;
 
         let hc: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
         Self::new(num_filters, &hc, h_len)
     }
 
-    pub fn new_rnyquist(filter_type: design::FirdesFilterType, num_filters: usize, k: usize, m: usize, beta: f32) -> Result<Self> {
+    pub fn new_rnyquist(filter_type: filter::FirFilterType, num_filters: usize, k: usize, m: usize, beta: f32) -> Result<Self> {
         if num_filters == 0 {
             return Err(Error::Config("number of filters must be greater than zero".into()));
         }
@@ -92,13 +92,13 @@ where
         }
 
         let h_len = 2 * num_filters * k * m + 1;
-        let hf = design::fir_design_prototype(filter_type, num_filters * k, m, beta, 0.0)?;
+        let hf = filter::fir_design_prototype(filter_type, num_filters * k, m, beta, 0.0)?;
 
         let hc: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
         Self::new(num_filters, &hc, h_len)
     }
 
-    pub fn new_drnyquist(filter_type: design::FirdesFilterType, num_filters: usize, k: usize, m: usize, beta: f32) -> Result<Self> {
+    pub fn new_drnyquist(filter_type: filter::FirFilterType, num_filters: usize, k: usize, m: usize, beta: f32) -> Result<Self> {
         if num_filters == 0 {
             return Err(Error::Config("number of filters must be greater than zero".into()));
         }
@@ -113,7 +113,7 @@ where
         }
 
         let h_len = 2 * num_filters * k * m + 1;
-        let hf = design::fir_design_prototype(filter_type, num_filters * k, m, beta, 0.0)?;
+        let hf = filter::fir_design_prototype(filter_type, num_filters * k, m, beta, 0.0)?;
 
         let mut dhf = vec![0.0; h_len];
         let mut hdh_max: f32 = 0.0;

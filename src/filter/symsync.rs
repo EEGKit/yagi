@@ -1,11 +1,9 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::fir::firpfb::FirPfb;
-use crate::filter::fir::design;
+use crate::filter::{self, FirPfb, FirFilterType};
 use crate::filter::iir::iirfiltsos::IirFiltSos;
 use num_complex::ComplexFloat;
 
-use super::fir::design::FirdesFilterType;
 
 #[derive(Clone, Debug)]
 pub struct Symsync<T> {
@@ -111,7 +109,7 @@ where
         Ok(q)
     }
 
-    pub fn new_rnyquist(ftype: FirdesFilterType, k: usize, m: usize, beta: f32, num_filters: usize) -> Result<Self> {
+    pub fn new_rnyquist(ftype: FirFilterType, k: usize, m: usize, beta: f32, num_filters: usize) -> Result<Self> {
         if k < 2 {
             return Err(Error::Config("samples/symbol must be at least 2".into()));
         }
@@ -127,7 +125,7 @@ where
 
         let h_len = 2 * num_filters * k * m + 1;
 
-        let h = design::fir_design_prototype(ftype, k * num_filters, m, beta, 0.0)?;
+        let h = filter::fir_design_prototype(ftype, k * num_filters, m, beta, 0.0)?;
 
         Self::new(k, num_filters, &h, h_len)
     }
@@ -150,7 +148,7 @@ where
 
         let fc = 0.75f32;
         let as_ = 40.0f32;
-        let mut h = design::kaiser::fir_design_kaiser(h_len, fc / (k as f32 * num_filters as f32), as_, 0.0)?;
+        let mut h = filter::fir_design_kaiser(h_len, fc / (k as f32 * num_filters as f32), as_, 0.0)?;
 
         for c in h.iter_mut() {
             *c *= 2.0 * fc;
@@ -284,8 +282,7 @@ mod tests {
     use test_macro::autotest_annotate;
     use num_complex::Complex32;
     use crate::sequence::MSequence;
-    use crate::filter::fir::design::FirdesFilterType;
-    use crate::filter::fir::firinterp::FirInterp;
+    use crate::filter::FirInterp;
     use crate::filter::resampler::resamp::Resamp;
     use crate::random::randnf;
 
@@ -294,7 +291,7 @@ mod tests {
     fn test_symsync_copy() {
         // create base object
         let mut q0 = Symsync::<Complex32>::new_rnyquist(
-            FirdesFilterType::Arkaiser,
+            FirFilterType::Arkaiser,
             5,
             7,
             0.25,
@@ -349,10 +346,10 @@ mod tests {
         assert!(Symsync::<Complex32>::new(2, 12, &[], 0).is_err()); // h_len is too small
         assert!(Symsync::<Complex32>::new(2, 12, &[], 47).is_err()); // h_len is not divisible by M
 
-        assert!(Symsync::<Complex32>::new_rnyquist(FirdesFilterType::Rrcos, 0, 12, 0.2, 48).is_err()); // k is too small
-        assert!(Symsync::<Complex32>::new_rnyquist(FirdesFilterType::Rrcos, 2, 0, 0.2, 48).is_err()); // m is too small
-        assert!(Symsync::<Complex32>::new_rnyquist(FirdesFilterType::Rrcos, 2, 12, 7.2, 48).is_err()); // beta is too large
-        assert!(Symsync::<Complex32>::new_rnyquist(FirdesFilterType::Rrcos, 2, 12, 0.2, 0).is_err()); // M is too small
+        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterType::Rrcos, 0, 12, 0.2, 48).is_err()); // k is too small
+        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterType::Rrcos, 2, 0, 0.2, 48).is_err()); // m is too small
+        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterType::Rrcos, 2, 12, 7.2, 48).is_err()); // beta is too large
+        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterType::Rrcos, 2, 12, 0.2, 0).is_err()); // M is too small
 
         assert!(Symsync::<Complex32>::new_kaiser(0, 12, 0.2, 48).is_err()); // k is too small
         assert!(Symsync::<Complex32>::new_kaiser(2, 0, 0.2, 48).is_err()); // m is too small
@@ -387,9 +384,9 @@ mod tests {
 
         // transmit filter type
         let ftype_tx = if method == "rnyquist" {
-            FirdesFilterType::Arkaiser
+            FirFilterType::Arkaiser
         } else {
-            FirdesFilterType::Kaiser
+            FirFilterType::Kaiser
         };
 
         let bt: f32 = 0.02;               // loop filter bandwidth
@@ -534,9 +531,9 @@ mod tests {
 
         // transmit filter type
         let ftype_tx = if method == "rnyquist" {
-            FirdesFilterType::Arkaiser
+            FirFilterType::Arkaiser
         } else {
-            FirdesFilterType::Kaiser
+            FirFilterType::Kaiser
         };
 
         let bt    = 0.01f32;               // loop filter bandwidth

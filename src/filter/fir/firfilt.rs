@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::fir::design;
+use crate::filter;
 use std::collections::VecDeque;
 use std::f32::consts::PI;
 use std::marker::PhantomData;
@@ -55,7 +55,7 @@ where
     /// 
     /// A new `Firfilt` object.
     pub fn new_kaiser(n: usize, fc: f32, as_: f32, mu: f32) -> Result<Self> {
-        let h = design::kaiser::fir_design_kaiser(n, fc, as_, mu)?;
+        let h = filter::fir_design_kaiser(n, fc, as_, mu)?;
         let h_c = h.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         Self::new(&h_c)
     }
@@ -73,8 +73,8 @@ where
     /// # Returns
     /// 
     /// A new `Firfilt` object.
-    pub fn new_rnyquist(ftype: design::FirdesFilterType, k: usize, m: usize, beta: f32, mu: f32) -> Result<Self> {
-        let h = design::fir_design_prototype(ftype, k, m, beta, mu)?;
+    pub fn new_rnyquist(ftype: filter::FirFilterType, k: usize, m: usize, beta: f32, mu: f32) -> Result<Self> {
+        let h = filter::fir_design_prototype(ftype, k, m, beta, mu)?;
         let h_c = h.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         Self::new(&h_c)
     }
@@ -91,7 +91,7 @@ where
     /// 
     /// A new `Firfilt` object.
     pub fn new_firdespm(h_len: usize, fc: f32, as_: f32) -> Result<Self> {
-        let mut h = design::pm::fir_design_pm_lowpass(h_len, fc, as_, 0.0)?;
+        let mut h = filter::fir_design_pm_lowpass(h_len, fc, as_, 0.0)?;
         // scale by filter bandwidth to be consistent with other lowpass prototypes
         for h_i in h.iter_mut() {
             *h_i = *h_i * 0.5 / fc;
@@ -128,7 +128,7 @@ where
     /// 
     /// A new `Firfilt` object.
     pub fn new_dc_blocker(m: usize, as_: f32) -> Result<Self> {
-        let h = design::fir_design_notch(m, 0.0, as_)?;
+        let h = filter::fir_design_notch(m, 0.0, as_)?;
         let h_c = h.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         Self::new(&h_c)
     }
@@ -209,13 +209,13 @@ where
     }
 
     pub fn freqresponse(&self, fc: f32) -> Complex32 {
-        let h_fc = design::freqresponse(&self.h, fc).unwrap();
+        let h_fc = filter::freqresponse(&self.h, fc).unwrap();
         h_fc * Complex32::from(self.scale)
     }
 
     pub fn groupdelay(&self, fc: f32) -> Result<f32> {
         let h = self.h.iter().map(|&x| x.re()).collect::<Vec<f32>>();
-        design::fir_group_delay(&h, fc)
+        filter::fir_group_delay(&h, fc)
     }
 }
 
@@ -225,7 +225,7 @@ where
     VecDeque<T>: DotProd<f32, Output = T>,
 {
     pub fn new_notch(m: usize, as_: f32, f0: f32) -> Result<Self> {
-        let h = design::fir_design_notch(m, f0, as_)?;
+        let h = filter::fir_design_notch(m, f0, as_)?;
         let h_c = h.iter().map(|&x| x.into()).collect::<Vec<f32>>();
         Self::new(&h_c)
     }
@@ -238,7 +238,7 @@ where
 {
     pub fn new_notch(m: usize, as_: f32, f0: f32) -> Result<Self> {
         // design notch filter as DC blocker, then mix to appropriate frequency 
-        let h = design::fir_design_notch(m, 0.0, as_)?;
+        let h = filter::fir_design_notch(m, 0.0, as_)?;
         let mut h_c = h.iter().map(|&x| Complex32::new(x, 0.0)).collect::<Vec<Complex32>>();
         for (i, h_i) in h_c.iter_mut().enumerate() {
             let phi = 2.0 * PI * f0 * (i as f32 - m as f32);
@@ -253,7 +253,7 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use test_macro::autotest_annotate;
-    use crate::filter::fir::design::FirdesFilterType;
+    use crate::filter::fir::design::FirFilterType;
     use crate::utility::test_helpers::{PsdRegion, validate_psd_firfilt, validate_psd_firfiltc};
 
     #[test]
@@ -343,7 +343,7 @@ mod tests {
         // no need to check every combination
         assert!(FirFilt::<Complex32, f32>::new(&[]).is_err());
         assert!(FirFilt::<Complex32, f32>::new_kaiser(0, 0.0, 0.0, 0.0).is_err());
-        assert!(FirFilt::<Complex32, f32>::new_rnyquist(design::FirdesFilterType::Arkaiser, 0, 0, 0.0, 4.0).is_err());
+        assert!(FirFilt::<Complex32, f32>::new_rnyquist(filter::FirFilterType::Arkaiser, 0, 0, 0.0, 4.0).is_err());
         assert!(FirFilt::<Complex32, f32>::new_firdespm(0, 0.0, 0.0).is_err());
         assert!(FirFilt::<Complex32, f32>::new_rect(0).is_err());
         assert!(FirFilt::<Complex32, f32>::new_dc_blocker(0, 0.0).is_err());
@@ -589,7 +589,7 @@ mod tests {
         // No need to explicitly destroy filter object or free memory in Rust
     }
 
-    fn testbench_firfilt_rnyquist(ftype: FirdesFilterType, // filter type
+    fn testbench_firfilt_rnyquist(ftype: FirFilterType, // filter type
                                   k: usize,             // samples/symbol
                                   m: usize,             // semi-length
                                   beta: f32,            // excess bandwidth factor
@@ -602,11 +602,11 @@ mod tests {
         let mut hc = vec![0.0; hc_len]; // composite filter
 
         // design the filter(s)
-        let ht = design::fir_design_prototype(ftype, k, m, beta, dt).unwrap();
+        let ht = filter::fir_design_prototype(ftype, k, m, beta, dt).unwrap();
 
         // special case for GMSK
-        let hr = if ftype == FirdesFilterType::Gmsktx {
-            design::fir_design_prototype(FirdesFilterType::Gmskrx, k, m, beta, dt).unwrap()
+        let hr = if ftype == FirFilterType::Gmsktx {
+            filter::fir_design_prototype(filter::FirFilterType::Gmskrx, k, m, beta, dt).unwrap()
         } else {
             ht.clone()
         };
@@ -616,7 +616,7 @@ mod tests {
         // compute composite filter response (auto-correlation)
         for i in 0..hc_len {
             let lag = i as i32 - (2 * k * m) as i32;
-            hc[i] = design::filter_crosscorr(&ht, &hr, lag as isize);
+            hc[i] = filter::filter_crosscorr(&ht, &hr, lag as isize);
         };
 
         // compute filter inter-symbol interference
@@ -630,7 +630,7 @@ mod tests {
 
         // compute relative stop-band energy
         let nfft = 2048;
-        let as_ = 20.0 * design::filter_energy(&ht, 0.5 * (1.0 + beta) / k as f32, nfft).unwrap().log10();
+        let as_ = 20.0 * filter::filter_energy(&ht, 0.5 * (1.0 + beta) / k as f32, nfft).unwrap().log10();
 
         assert_relative_eq!(rxx0, k as f32, max_relative = 0.01);
         assert!(isi_rms < -50.0);
@@ -640,76 +640,76 @@ mod tests {
     // test different filter designs, nominal parameters
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_arkaiser)]
-    fn test_firfilt_rnyquist_baseline_arkaiser() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_arkaiser() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rkaiser)]
-    fn test_firfilt_rnyquist_baseline_rkaiser() { testbench_firfilt_rnyquist(FirdesFilterType::Rkaiser, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rkaiser() { testbench_firfilt_rnyquist(FirFilterType::Rkaiser, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rrc)]
-    fn test_firfilt_rnyquist_baseline_rrc() { testbench_firfilt_rnyquist(FirdesFilterType::Rrcos, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rrc() { testbench_firfilt_rnyquist(FirFilterType::Rrcos, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_hm3)]
-    fn test_firfilt_rnyquist_baseline_hm3() { testbench_firfilt_rnyquist(FirdesFilterType::Hm3, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_hm3() { testbench_firfilt_rnyquist(FirFilterType::Hm3, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_gmsktxrx)]
-    fn test_firfilt_rnyquist_baseline_gmsktxrx() { testbench_firfilt_rnyquist(FirdesFilterType::Gmsktx, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_gmsktxrx() { testbench_firfilt_rnyquist(FirFilterType::Gmsktx, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rfexp)]
-    fn test_firfilt_rnyquist_baseline_rfexp() { testbench_firfilt_rnyquist(FirdesFilterType::Rfexp, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rfexp() { testbench_firfilt_rnyquist(FirFilterType::Rfexp, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rfsech)]
-    fn test_firfilt_rnyquist_baseline_rfsech() { testbench_firfilt_rnyquist(FirdesFilterType::Rfsech, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rfsech() { testbench_firfilt_rnyquist(FirFilterType::Rfsech, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rfarcsech)]
-    fn test_firfilt_rnyquist_baseline_rfarcsech() { testbench_firfilt_rnyquist(FirdesFilterType::Rfarcsech, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rfarcsech() { testbench_firfilt_rnyquist(FirFilterType::Rfarcsech, 2, 9, 0.3, 0.0); }
 
     // test different parameters
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_0)]
-    fn test_firfilt_rnyquist_0() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 2, 4, 0.33, 0.0); } // short length
+    fn test_firfilt_rnyquist_0() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 4, 0.33, 0.0); } // short length
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_1)]
-    fn test_firfilt_rnyquist_1() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 2, 12, 0.20, 0.0); } // longer length
+    fn test_firfilt_rnyquist_1() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 12, 0.20, 0.0); } // longer length
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_2)]
-    fn test_firfilt_rnyquist_2() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 2, 40, 0.20, 0.0); } // very long length
+    fn test_firfilt_rnyquist_2() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 40, 0.20, 0.0); } // very long length
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_3)]
-    fn test_firfilt_rnyquist_3() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 3, 12, 0.20, 0.0); } // k=3
+    fn test_firfilt_rnyquist_3() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 3, 12, 0.20, 0.0); } // k=3
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_4)]
-    fn test_firfilt_rnyquist_4() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 4, 12, 0.20, 0.0); } // k=4
+    fn test_firfilt_rnyquist_4() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 4, 12, 0.20, 0.0); } // k=4
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_5)]
-    fn test_firfilt_rnyquist_5() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 5, 12, 0.20, 0.0); } // k=5
+    fn test_firfilt_rnyquist_5() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 5, 12, 0.20, 0.0); } // k=5
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_6)]
-    fn test_firfilt_rnyquist_6() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 20, 12, 0.20, 0.0); } // k=20
+    fn test_firfilt_rnyquist_6() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 20, 12, 0.20, 0.0); } // k=20
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_7)]
-    fn test_firfilt_rnyquist_7() { testbench_firfilt_rnyquist(FirdesFilterType::Arkaiser, 2, 12, 0.80, 0.0); } // large excess bandwidth
+    fn test_firfilt_rnyquist_7() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 12, 0.80, 0.0); } // large excess bandwidth
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_8)]
-    fn test_firfilt_rnyquist_8() { testbench_firfilt_rnyquist(FirdesFilterType::Rkaiser, 2, 12, 0.20, 0.5); } // iterative design, typical
+    fn test_firfilt_rnyquist_8() { testbench_firfilt_rnyquist(FirFilterType::Rkaiser, 2, 12, 0.20, 0.5); } // iterative design, typical
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_9)]
-    fn test_firfilt_rnyquist_9() { testbench_firfilt_rnyquist(FirdesFilterType::Rkaiser, 20, 40, 0.20, 0.5); } // iterative design, stressed
+    fn test_firfilt_rnyquist_9() { testbench_firfilt_rnyquist(FirFilterType::Rkaiser, 20, 40, 0.20, 0.5); } // iterative design, stressed
 
 
     #[test]
@@ -730,7 +730,7 @@ mod tests {
 
         // run tests
         for i in 0..4 {
-            let g = design::fir_group_delay(&h, fc[i]).unwrap();
+            let g = filter::fir_group_delay(&h, fc[i]).unwrap();
             assert_relative_eq!(g, g0[i], max_relative = tol);
         }
 

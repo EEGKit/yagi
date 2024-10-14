@@ -127,7 +127,7 @@ mod tests {
     use crate::random::randnf;
     use crate::math::WindowType;
     use crate::fft::spgram::Spgram;
-    use crate::filter::fir::design::FirdesFilterType;
+    use crate::filter::FirFilterType;
     use crate::modem::modem::ModulationScheme;
     use crate::utility::test_helpers::{PsdRegion, validate_psd_spectrum};
     use crate::framing::symstreamr::SymStreamR;
@@ -146,7 +146,7 @@ mod tests {
         // create and configure objects
         let mut q = Spgram::<Complex32>::new(nfft, WindowType::Hann, nfft/2, nfft/4).unwrap();
         let mut gen = SymStreamR::new_linear(
-            FirdesFilterType::Kaiser,
+            FirFilterType::Kaiser,
             bw * interp_factor as f32,
             25,
             0.2,

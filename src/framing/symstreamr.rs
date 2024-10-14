@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::filter::resampler::msresamp::MsResamp;
 use crate::framing::symstream::SymStream;
-use crate::filter::fir::design::FirdesFilterType;
+use crate::filter::FirFilterType;
 use crate::modem::modem::ModulationScheme;
 use crate::math::nextpow2;
 use num_complex::Complex32;
@@ -17,11 +17,11 @@ pub struct SymStreamR {
 
 impl SymStreamR {
     pub fn new() -> Result<Self> {
-        Self::new_linear(FirdesFilterType::Arkaiser, 0.5, 7, 0.3, ModulationScheme::Qpsk)
+        Self::new_linear(FirFilterType::Arkaiser, 0.5, 7, 0.3, ModulationScheme::Qpsk)
     }
 
     pub fn new_linear(
-        ftype: FirdesFilterType,
+        ftype: FirFilterType,
         bw: f32,
         m: usize,
         beta: f32,
@@ -59,7 +59,7 @@ impl SymStreamR {
         self.buf_index = 0;
     }
 
-    pub fn get_ftype(&self) -> FirdesFilterType {
+    pub fn get_ftype(&self) -> FirFilterType {
         self.symstream.get_ftype()
     }
 
@@ -139,7 +139,7 @@ mod tests {
 
     fn testbench_symstreamrcf_delay(bw: f32, m: usize) {
         // create object and get expected delay
-        let ftype = FirdesFilterType::Arkaiser;
+        let ftype = FirFilterType::Arkaiser;
         let beta = 0.30;
         let ms = ModulationScheme::Qpsk;
         let mut gen = SymStreamR::new_linear(ftype, bw, m, beta, ms).unwrap();
@@ -261,7 +261,7 @@ mod tests {
 
     fn testbench_symstreamrcf_psd(bw: f32, m: usize, beta: f32) {
         // create object
-        let ftype = FirdesFilterType::Arkaiser;
+        let ftype = FirFilterType::Arkaiser;
         let ms = ModulationScheme::Qpsk;
         let mut gen = SymStreamR::new_linear(ftype, bw, m, beta, ms).unwrap();
         gen.set_gain(bw.sqrt());
@@ -330,7 +330,7 @@ mod tests {
     fn test_symstreamrcf_copy() {
         // create objects
         let mut gen_orig = SymStream::new_linear(
-            FirdesFilterType::Arkaiser,
+            FirFilterType::Arkaiser,
             5, // k = 1/0.2
             17,
             0.27,

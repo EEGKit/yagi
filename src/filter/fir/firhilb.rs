@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::buffer::Window;
 use crate::dotprod::DotProd;
-use crate::filter::fir::design;
+use crate::filter;
 use num_traits::Zero;
 use std::f32::consts::PI;
 
@@ -30,7 +30,7 @@ impl FirHilb {
         let mut hq = vec![0.0; hq_len];
         let as_ = as_.abs();
 
-        let mut h = design::kaiser::fir_design_kaiser(h_len, 0.25, as_, 0.0)?;
+        let mut h = filter::fir_design_kaiser(h_len, 0.25, as_, 0.0)?;
 
         for i in 0..h_len {
             let t = i as f32 - (h_len - 1) as f32 / 2.0;
@@ -258,7 +258,7 @@ mod tests {
 
         // generate the baseband signal (filter pulse)
         let w: f32 = 0.36 * bw; // pulse bandwidth
-        let h = design::kaiser::fir_design_kaiser(h_len, w, 80.0, 0.0).unwrap();
+        let h = filter::fir_design_kaiser(h_len, w, 80.0, 0.0).unwrap();
         for i in 0..num_samples {
             buf_0[i] = Complex32::new(if i < h_len { 2.0 * w * h[i] } else { 0.0 }, 0.0);
         }

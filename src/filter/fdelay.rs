@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::fir::firpfb::FirPfb;
+use crate::filter::FirPfb;
 use crate::buffer::Window;
 
 use num_complex::ComplexFloat;

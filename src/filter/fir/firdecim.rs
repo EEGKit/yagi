@@ -57,13 +57,13 @@ where
 
         let h_len = 2 * decimation_factor * m + 1;
         let fc = 0.5 / decimation_factor as f32;
-        let hf = design::kaiser::fir_design_kaiser(h_len, fc, as_, 0.0)?;
+        let hf = design::fir_design_kaiser(h_len, fc, as_, 0.0)?;
 
         let hc: Vec<Coeff> = hf.iter().map(|&x| Coeff::from(x).unwrap()).collect();
         Self::new(decimation_factor, &hc, h_len)
     }
 
-    pub fn new_prototype(filter_type: design::FirdesFilterType, decimation_factor: usize, m: usize, beta: f32, dt: f32) -> Result<Self> {
+    pub fn new_prototype(filter_type: design::FirFilterType, decimation_factor: usize, m: usize, beta: f32, dt: f32) -> Result<Self> {
         if decimation_factor < 2 {
             return Err(Error::Config("decimation factor must be greater than 1".into()));
         }
@@ -134,7 +134,7 @@ mod tests {
     use test_macro::autotest_annotate;
     use approx::assert_relative_eq;
     use crate::math::WindowType;
-    use crate::filter::fir::design::FirdesFilterType;
+    use crate::filter::fir::design::FirFilterType;
 
     #[test]
     #[autotest_annotate(autotest_firdecim_config)]
@@ -155,10 +155,10 @@ mod tests {
         assert!(FirDecim::<Complex32, f32>::new_kaiser(4, 12, -2.0).is_err()); // As too small
 
         // assert!(FirDecim::<Complex32, f32>::new_prototype(FirdesFilterType::Unknown, 4, 12, 0.3, 0.0).is_err());
-        assert!(FirDecim::<Complex32, f32>::new_prototype(FirdesFilterType::Rcos, 1, 12, 0.3, 0.0).is_err());
-        assert!(FirDecim::<Complex32, f32>::new_prototype(FirdesFilterType::Rcos, 4, 0, 0.3, 0.0).is_err());
-        assert!(FirDecim::<Complex32, f32>::new_prototype(FirdesFilterType::Rcos, 4, 12, 7.2, 0.0).is_err());
-        assert!(FirDecim::<Complex32, f32>::new_prototype(FirdesFilterType::Rcos, 4, 12, 0.3, 4.0).is_err());
+        assert!(FirDecim::<Complex32, f32>::new_prototype(FirFilterType::Rcos, 1, 12, 0.3, 0.0).is_err());
+        assert!(FirDecim::<Complex32, f32>::new_prototype(FirFilterType::Rcos, 4, 0, 0.3, 0.0).is_err());
+        assert!(FirDecim::<Complex32, f32>::new_prototype(FirFilterType::Rcos, 4, 12, 7.2, 0.0).is_err());
+        assert!(FirDecim::<Complex32, f32>::new_prototype(FirFilterType::Rcos, 4, 12, 0.3, 4.0).is_err());
 
         // create valid object and test configuration
         let mut decim = FirDecim::<Complex32, f32>::new_kaiser(m, n, 60.0).unwrap();
@@ -179,7 +179,7 @@ mod tests {
         let mut buf_2 = vec![Complex32::new(0.0, 0.0); num_blocks]; // output (block)
 
         let mut decim = FirDecim::<Complex32, f32>::new_prototype(
-            FirdesFilterType::Arkaiser, m, n, beta, 0.0).unwrap();
+            FirFilterType::Arkaiser, m, n, beta, 0.0).unwrap();
 
         // create random-ish input (does not really matter what the input is
         // so long as the outputs match, but systematic for repeatability)

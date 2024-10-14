@@ -5,13 +5,13 @@ use crate::math::windows;
 /// Design FIR using kaiser window
 ///
 /// # Arguments
-/// * `n`      : filter length, _n > 0
-/// * `fc`     : cutoff frequency, 0 < _fc < 0.5
-/// * `as_`    : stop-band attenuation [dB], _as > 0
-/// * `mu`     : fractional sample offset, -0.5 < _mu < 0.5
+/// * `n`      : filter length, n > 0
+/// * `fc`     : cutoff frequency, 0 < fc < 0.5
+/// * `as_`    : stop-band attenuation [dB], as_ > 0
+/// * `mu`     : fractional sample offset, -0.5 < mu < 0.5
 ///
 /// # Returns
-/// * `h`      : output coefficient buffer, [size: _n x 1]
+/// * `Vec<f32>` : filter coefficients
 pub fn fir_design_kaiser(n: usize, fc: f32, as_: f32, mu: f32) -> Result<Vec<f32>> {
     // validate input
     if mu <= -0.5 || mu > 0.5 {
@@ -50,15 +50,15 @@ pub fn fir_design_kaiser(n: usize, fc: f32, as_: f32, mu: f32) -> Result<Vec<f32
 }
 
 
-// [Vaidyanathan:1993]
 /// Compute Kaiser window beta factor from stop-band attenuation
 ///
 /// # Arguments
-/// * `as_`    : target filter's stop-band attenuation [dB], _as > 0
+/// * `as_`    : target filter's stop-band attenuation [dB], as_ > 0
 ///
 /// # Returns
-/// * `beta`   : Kaiser window beta factor
+/// * `f32` : Kaiser window beta factor
 pub fn kaiser_beta_stopband_attenuation(as_: f32) -> f32 {
+    // [Vaidyanathan:1993]
     let as_abs = as_.abs();
     if as_abs > 50.0 {
         0.1102 * (as_abs - 8.7)

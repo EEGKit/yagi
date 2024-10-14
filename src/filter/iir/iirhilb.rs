@@ -168,7 +168,7 @@ impl IirHilb {
 mod tests {
     use super::*;
     use test_macro::autotest_annotate;
-    use crate::filter::fir::design as fir_design;
+    use crate::filter;
     use crate::math::kaiser;
     use crate::utility::test_helpers::{PsdRegion, validate_psd_signal, validate_psd_signalf};
 
@@ -194,7 +194,7 @@ mod tests {
 
         // generate the baseband signal (filter pulse)
         let w = 0.36 * bw; // pulse bandwidth
-        let h = fir_design::kaiser::fir_design_kaiser(h_len, w, 80.0, 0.0).unwrap();
+        let h = filter::fir_design_kaiser(h_len, w, 80.0, 0.0).unwrap();
         for i in 0..num_samples {
             buf_0[i] = Complex32::new(if i < h_len { 2.0 * w * h[i] } else { 0.0 }, 0.0);
         }
@@ -254,7 +254,7 @@ mod tests {
 
         // generate the baseband signal (filter pulse)
         let w = 0.36 * bw;
-        let h = fir_design::kaiser::fir_design_kaiser(h_len, w, 80.0, 0.0).unwrap();
+        let h = filter::fir_design_kaiser(h_len, w, 80.0, 0.0).unwrap();
         for i in 0..num_samples {
             buf_0[i] = if i < h_len {
                 2.0 * w * h[i] * Complex32::from_polar(1.0, 2.0 * std::f32::consts::PI * f0 * i as f32)

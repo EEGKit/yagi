@@ -1,7 +1,6 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::fir::firpfb::FirPfb;
-use crate::filter::fir::design;
+use crate::filter;
 use std::f32::consts::PI;
 use num_complex::ComplexFloat;
 
@@ -9,7 +8,7 @@ use num_complex::ComplexFloat;
 pub struct FirInterp<T, Coeff = T> {
     h_sub_len: usize,
     interpolation_factor: usize,
-    filterbank: FirPfb<T, Coeff>,
+    filterbank: filter::FirPfb<T, Coeff>,
 }
 
 impl<T, Coeff> FirInterp<T, Coeff>
@@ -35,7 +34,7 @@ where
         let mut h_padded = vec![Coeff::zero(); h_len_padded];
         h_padded[..h_len].clone_from_slice(&h[..h_len]);
 
-        let filterbank = FirPfb::new(interp, &h_padded, h_len_padded)?;
+        let filterbank = filter::FirPfb::new(interp, &h_padded, h_len_padded)?;
 
         Ok(Self {
             h_sub_len,
@@ -57,13 +56,13 @@ where
 
         let h_len = 2 * interp * m + 1;
         let fc = 0.5 / interp as f32;
-        let hf = design::kaiser::fir_design_kaiser(h_len, fc, as_, 0.0)?;
+        let hf = filter::fir_design_kaiser(h_len, fc, as_, 0.0)?;
 
         let hc: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
         Self::new(interp, &hc, h_len - 1)
     }
 
-    pub fn new_prototype(filter_type: design::FirdesFilterType, interp: usize, m: usize, beta: f32, dt: f32) -> Result<Self> {
+    pub fn new_prototype(filter_type: filter::FirFilterType, interp: usize, m: usize, beta: f32, dt: f32) -> Result<Self> {
         if interp < 2 {
             return Err(Error::Config("interp factor must be greater than 1".into()));
         }
@@ -78,7 +77,7 @@ where
         }
 
         let h_len = 2 * interp * m + 1;
-        let h = design::fir_design_prototype(filter_type, interp, m, beta, dt)?;
+        let h = filter::fir_design_prototype(filter_type, interp, m, beta, dt)?;
 
         let hc: Vec<Coeff> = h.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
         Self::new(interp, &hc, h_len)
@@ -289,7 +288,7 @@ mod tests {
         }
     }
 
-    fn testbench_firinterp_crcf_nyquist(ftype: design::FirdesFilterType, m: usize, k: usize, beta: f32) {
+    fn testbench_firinterp_crcf_nyquist(ftype: filter::FirFilterType, m: usize, k: usize, beta: f32) {
         let tol = 1e-6;
         // create interpolator object
         let mut interp = FirInterp::<Complex32, f32>::new_prototype(ftype, m, k, beta, 0.0).unwrap();
@@ -320,25 +319,25 @@ mod tests {
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_rnyquist_0)]
     fn test_firinterp_crcf_rnyquist_0() {
-        testbench_firinterp_crcf_nyquist(design::FirdesFilterType::Kaiser, 2, 9, 0.3);
+        testbench_firinterp_crcf_nyquist(filter::FirFilterType::Kaiser, 2, 9, 0.3);
     }
 
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_rnyquist_1)]
     fn test_firinterp_crcf_rnyquist_1() {
-        testbench_firinterp_crcf_nyquist(design::FirdesFilterType::Kaiser, 3, 9, 0.3);
+        testbench_firinterp_crcf_nyquist(filter::FirFilterType::Kaiser, 3, 9, 0.3);
     }
 
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_rnyquist_2)]
     fn test_firinterp_crcf_rnyquist_2() {
-        testbench_firinterp_crcf_nyquist(design::FirdesFilterType::Kaiser, 7, 9, 0.3);
+        testbench_firinterp_crcf_nyquist(filter::FirFilterType::Kaiser, 7, 9, 0.3);
     }
 
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_rnyquist_3)]
     fn test_firinterp_crcf_rnyquist_3() {
-        testbench_firinterp_crcf_nyquist(design::FirdesFilterType::Rcos, 2, 9, 0.3);
+        testbench_firinterp_crcf_nyquist(filter::FirFilterType::Rcos, 2, 9, 0.3);
     }
 
     #[test]
