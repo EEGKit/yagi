@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::FirPfb;
+use crate::filter::FirPfbFilter;
 use crate::buffer::Window;
 
 use num_complex::ComplexFloat;
@@ -12,7 +12,7 @@ pub struct Fdelay<T, Coeff = T> {
     npfb: usize,
     delay: f32,
     w: Window<T>,
-    pfb: FirPfb<T, Coeff>,
+    pfb: FirPfbFilter<T, Coeff>,
     w_index: usize,
     f_index: usize,
 }
@@ -35,7 +35,7 @@ where
         }
 
         let w = Window::new(nmax + 1)?;
-        let pfb = FirPfb::default(npfb, m)?;
+        let pfb = FirPfbFilter::default(npfb, m)?;
 
         let mut q = Self {
             nmax,

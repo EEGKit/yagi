@@ -5,20 +5,32 @@ use crate::filter;
 
 use num_complex::ComplexFloat;
 
+/// Finite impulse response (FIR) polyphase filter bank (PFB)
 #[derive(Clone, Debug)]
-pub struct FirPfb<T, Coeff = T> {
+pub struct FirPfbFilter<T, Coeff = T> {
     num_filters: usize,
     w: Window<T>,
     filters: Vec<Vec<Coeff>>,
     scale: Coeff,
 }
 
-impl<T, Coeff> FirPfb<T, Coeff>
+impl<T, Coeff> FirPfbFilter<T, Coeff>
 where
     Coeff: Clone + Copy + ComplexFloat<Real = f32> + From<f32>,
     T: Clone + Copy + ComplexFloat<Real = f32> + std::ops::Mul<Coeff, Output = T> + Default,
     [Coeff]: DotProd<T, Output = T>,
 {
+    /// Create a new FIR PFB filter bank
+    /// 
+    /// # Arguments
+    /// 
+    /// * `num_filters` - number of filters in the bank
+    /// * `h` - filter coefficients
+    /// * `h_len` - filter length
+    /// 
+    /// # Returns
+    /// 
+    /// A new FIR PFB filter bank
     pub fn new(num_filters: usize, h: &[Coeff], h_len: usize) -> Result<Self> {
         if num_filters == 0 {
             return Err(Error::Config("number of filters must be greater than zero".into()));
@@ -52,10 +64,38 @@ where
         Ok(q)
     }
 
+    /// Create a new FIR PFB filter bank with default parameters
+    /// 
+    /// This is equivalent to:
+    /// 
+    /// ```
+    /// FirPfbFilter::new_kaiser(num_filters, m, 0.5, 60.0)
+    /// ```
+    /// 
+    /// # Arguments
+    /// 
+    /// * `num_filters` - number of filters in the bank
+    /// * `m` - filter delay
+    /// 
+    /// # Returns
+    /// 
+    /// A new FIR PFB filter bank
     pub fn default(num_filters: usize, m: usize) -> Result<Self> {
         Self::new_kaiser(num_filters, m, 0.5, 60.0)
     }
 
+    /// Create a new FIR PFB filter bank using Kaiser-Bessel windowed sinc filter design
+    /// 
+    /// # Arguments
+    /// 
+    /// * `num_filters` - number of filters in the bank
+    /// * `m` - filter delay
+    /// * `fc` - filter normalized cut-off frequency
+    /// * `as_` - filter stop-band suppression [dB]
+    /// 
+    /// # Returns
+    /// 
+    /// A new FIR PFB filter bank
     pub fn new_kaiser(num_filters: usize, m: usize, fc: f32, as_: f32) -> Result<Self> {
         if num_filters == 0 {
             return Err(Error::Config("number of filters must be greater than zero".into()));
@@ -73,11 +113,24 @@ where
         let h_len = 2 * num_filters * m + 1;
         let hf = filter::fir_design_kaiser(h_len, fc / num_filters as f32, as_, 0.0)?;
 
-        let hc: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
+        let hc: Vec<Coeff> = hf.iter().map(|&x| x.into()).collect();
         Self::new(num_filters, &hc, h_len)
     }
 
-    pub fn new_rnyquist(filter_type: filter::FirFilterType, num_filters: usize, k: usize, m: usize, beta: f32) -> Result<Self> {
+    /// Create a new FIR PFB filter bank using square-root Nyquist prototype filter design
+    /// 
+    /// # Arguments
+    /// 
+    /// * `filter_type` - filter type
+    /// * `num_filters` - number of filters in the bank
+    /// * `k` - samples/symbol
+    /// * `m` - filter delay
+    /// * `beta` - excess bandwidth factor
+    /// 
+    /// # Returns
+    /// 
+    /// A new FIR PFB filter bank
+    pub fn new_rnyquist(filter_type: filter::FirFilterShape, num_filters: usize, k: usize, m: usize, beta: f32) -> Result<Self> {
         if num_filters == 0 {
             return Err(Error::Config("number of filters must be greater than zero".into()));
         }
@@ -94,11 +147,24 @@ where
         let h_len = 2 * num_filters * k * m + 1;
         let hf = filter::fir_design_prototype(filter_type, num_filters * k, m, beta, 0.0)?;
 
-        let hc: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
+        let hc: Vec<Coeff> = hf.iter().map(|&x| x.into()).collect();
         Self::new(num_filters, &hc, h_len)
     }
 
-    pub fn new_drnyquist(filter_type: filter::FirFilterType, num_filters: usize, k: usize, m: usize, beta: f32) -> Result<Self> {
+    /// Create a new FIR PFB filter bank using square-root derivative Nyquist prototype filter design
+    /// 
+    /// # Arguments
+    /// 
+    /// * `filter_type` - filter type
+    /// * `num_filters` - number of filters in the bank
+    /// * `k` - samples/symbol
+    /// * `m` - filter delay
+    /// * `beta` - excess bandwidth factor
+    /// 
+    /// # Returns
+    /// 
+    /// A new FIR PFB filter bank
+    pub fn new_drnyquist(filter_type: filter::FirFilterShape, num_filters: usize, k: usize, m: usize, beta: f32) -> Result<Self> {
         if num_filters == 0 {
             return Err(Error::Config("number of filters must be greater than zero".into()));
         }
@@ -129,7 +195,7 @@ where
             hdh_max = hdh_max.max((hf[i] * dhf[i]).abs());
         }
 
-        let hc: Vec<Coeff> = dhf.iter().map(|&x| <Coeff as From<f32>>::from(x * 0.06 / hdh_max)).collect();
+        let hc: Vec<Coeff> = dhf.iter().map(|&x| (x * 0.06 / hdh_max).into()).collect();
         Self::new(num_filters, &hc, h_len)
     }
 
@@ -162,26 +228,56 @@ where
     //     Ok(())
     // }
 
+    /// Reset the filter bank
     pub fn reset(&mut self) -> () {
         self.w.reset();
     }
 
+    /// Set the output scaling for the filter bank
+    /// 
+    /// # Arguments
+    /// 
+    /// * `scale` - scaling factor to apply to each output sample
     pub fn set_scale(&mut self, scale: Coeff) {
         self.scale = scale;
     }
 
+    /// Get the output scaling for the filter bank
+    /// 
+    /// # Returns
+    /// 
+    /// The scaling factor applied to each output sample
     pub fn get_scale(&self) -> Coeff {
         self.scale
     }
 
+    /// Push a sample into the filter bank
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - input sample
     pub fn push(&mut self, x: T) -> () {
         self.w.push(x)
     }
 
+    /// Write a block of samples into the filter bank
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - input samples
     pub fn write(&mut self, x: &[T]) -> () {
         self.w.write(x)
     }
 
+    /// Execute the filter bank on a single input sample
+    /// 
+    /// # Arguments
+    /// 
+    /// * `i` - index of filter to use
+    /// 
+    /// # Returns
+    /// 
+    /// The output sample
     pub fn execute(&mut self, i: usize) -> Result<T> {
         if i >= self.num_filters {
             return Err(Error::Config(format!("filterbank index ({}) exceeds maximum ({})", i, self.num_filters)));
@@ -193,6 +289,13 @@ where
         Ok(y)
     }
 
+    /// Execute the filter bank on a block of input samples
+    /// 
+    /// # Arguments
+    /// 
+    /// * `i` - index of filter to use
+    /// * `x` - input samples
+    /// * `y` - output samples
     pub fn execute_block(&mut self, i: usize, x: &[T], y: &mut [T]) -> Result<()> {
         for (&xi, yi) in x.iter().zip(y.iter_mut()) {
             self.push(xi);
@@ -247,7 +350,7 @@ mod tests {
         ];
 
         // Load filter coefficients externally
-        let mut f = FirPfb::<f32, f32>::new(4, &h, 48).unwrap();
+        let mut f = FirPfbFilter::<f32, f32>::new(4, &h, 48).unwrap();
         
         for &n in noise.iter() {
             f.push(n);
@@ -267,7 +370,7 @@ mod tests {
         // create base object with irregular parameters
         let m = 13;
         let h = 7;
-        let mut q0 = FirPfb::<Complex32, f32>::default(m, h).unwrap();
+        let mut q0 = FirPfbFilter::<Complex32, f32>::default(m, h).unwrap();
 
         // run random samples through filter
         let num_samples = 80;

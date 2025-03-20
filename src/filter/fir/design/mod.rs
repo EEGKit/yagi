@@ -36,9 +36,9 @@ use num_complex::{Complex32, Complex64, ComplexFloat};
 //  [Vaidyanathan:1993] Vaidyanathan, P. P., "Multirate Systems and
 //      Filter Banks," 1993, Prentice Hall, Section 3.2.1
 
-/// Filter design type
+/// FIR filter design shape
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum FirFilterType {
+pub enum FirFilterShape {
     // Nyquist filter prototypes
 
     /// Nyquist Kaiser filter
@@ -108,9 +108,10 @@ const FILTER_INFO: [FilterInfo; 15] = [
 /// * `s`      : filter name
 ///
 /// # Returns
-/// * `FirdesFilterType`
-impl FirFilterType {
-    pub fn from_str(s: &str) -> Result<FirFilterType> {
+/// 
+/// A `FirFilterType` matching the filter name
+impl FirFilterShape {
+    pub fn from_str(s: &str) -> Result<FirFilterShape> {
         for (i, info) in FILTER_INFO.iter().enumerate() {
             if info.short_name == s {
                 return Ok(unsafe { std::mem::transmute(i as u8) });
@@ -132,7 +133,8 @@ const USE_KAISER_REQ_FILTER_LEN_ESTIMATE: bool = true;
 /// * `as_`    : stopband suppression level [dB] (as_ > 0)
 ///
 /// # Returns
-/// * `usize` : filter length
+/// 
+/// Filter length
 pub fn estimate_req_filter_len(df: f32, as_: f32) -> Result<usize> {
     if df <= 0.0 || df > 0.5 {
         return Err(Error::Config(format!("cutoff frequency ({}) out of range (0, 0.5)", df)));
@@ -154,7 +156,8 @@ pub fn estimate_req_filter_len(df: f32, as_: f32) -> Result<usize> {
 /// * `n`      : filter length
 ///
 /// # Returns
-/// * `f32` : stop-band attenuation [dB]
+/// 
+/// Stop-band attenuation [dB]
 pub fn estimate_req_filter_stopband_attenuation(df: f32, n: usize) -> Result<f32> {
     // run search for stop-band attenuation which gives these results
     let mut as0 = 0.01;    // lower bound
@@ -185,7 +188,8 @@ pub fn estimate_req_filter_stopband_attenuation(df: f32, n: usize) -> Result<f32
 /// * `n`      : filter length
 ///
 /// # Returns
-/// * `f32` : transition bandwidth
+/// 
+/// Transition bandwidth
 pub fn estimate_req_filter_transition_bandwidth(as_: f32, n: usize) -> Result<f32> {
     // run search for transition bandwidth which gives these results
     let mut df0 = 1e-3;    // lower bound
@@ -219,7 +223,8 @@ pub fn estimate_req_filter_transition_bandwidth(as_: f32, n: usize) -> Result<f3
 /// * `as_`    : stop-band attenuation [dB] (as_ > 0)
 ///
 /// # Returns
-/// * `f32` : filter length
+/// 
+/// Filter length
 pub fn estimate_req_filter_len_kaiser(df: f32, as_: f32) -> Result<f32> {
     // [Vaidyanathan:1993]
     if df > 0.5 || df <= 0.0 {
@@ -240,7 +245,8 @@ pub fn estimate_req_filter_len_kaiser(df: f32, as_: f32) -> Result<f32> {
 /// * `as_`    : stop-band attenuation [dB] (as_ > 0)
 ///
 /// # Returns
-/// * `f32` : filter length
+/// 
+/// Filter length
 pub fn estimate_req_filter_len_herrmann(df: f32, as_: f32) -> Result<f32> {
     // [Herrmann:1973]
     if df > 0.5 || df <= 0.0 {
@@ -287,7 +293,8 @@ pub fn estimate_req_filter_len_herrmann(df: f32, as_: f32) -> Result<f32> {
 /// * `arg`    : window-specific argument, if required
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_windowf(wtype: windows::WindowType, n: usize, fc: f32, arg: f32) -> Result<Vec<f32>> {
     // validate input
     if fc <= 0.0 || fc > 0.5 {
@@ -324,7 +331,8 @@ pub fn fir_design_windowf(wtype: windows::WindowType, n: usize, fc: f32, arg: f3
 /// * `as_`    : stop-band attenuation [dB], as_ > 0
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_notch(m: usize, f0: f32, as_: f32) -> Result<Vec<f32>> {
 
     // validate inputs
@@ -379,8 +387,9 @@ pub fn fir_design_notch(m: usize, f0: f32, as_: f32) -> Result<Vec<f32>> {
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
-pub fn fir_design_prototype(ftype: FirFilterType, k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
+/// 
+/// Vec of filter coefficients
+pub fn fir_design_prototype(ftype: FirFilterShape, k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // compute filter parameters
     let h_len = 2 * k * m + 1;
     let fc = 0.5 / k as f32;
@@ -388,10 +397,10 @@ pub fn fir_design_prototype(ftype: FirFilterType, k: usize, m: usize, beta: f32,
     let as_ = estimate_req_filter_stopband_attenuation(df, h_len)?;
 
     match ftype {
-        FirFilterType::Kaiser => {
+        FirFilterShape::Kaiser => {
             kaiser::fir_design_kaiser(h_len, fc, as_, dt)
         }
-        FirFilterType::Pm => {
+        FirFilterShape::Pm => {
             // Parks-McClellan algorithm parameters
             let bands = [0.0, fc-0.5*df, fc, fc, fc+0.5*df, 0.5];
             let des = [k as f32, 0.5 * k as f32, 0.0];
@@ -399,43 +408,43 @@ pub fn fir_design_prototype(ftype: FirFilterType, k: usize, m: usize, beta: f32,
             let wtype = [pm::FirPmWeightType::Flat, pm::FirPmWeightType::Flat, pm::FirPmWeightType::Flat];
             pm::fir_design_pm(h_len, 3, &bands, &des, Some(&weights), Some(&wtype), pm::FirPmBandType::Bandpass)
         }
-        FirFilterType::Rcos => {
+        FirFilterShape::Rcos => {
             rcos::fir_design_rcos(k, m, beta, dt)
         }
-        FirFilterType::Fexp => {
+        FirFilterShape::Fexp => {
             fnyquist::fir_design_fexp(k, m, beta, dt)
         }
-        FirFilterType::Fsech => {
+        FirFilterShape::Fsech => {
             fnyquist::fir_design_fsech(k, m, beta, dt)
         }
-        FirFilterType::Farcsech => {
+        FirFilterShape::Farcsech => {
             fnyquist::fir_design_farcsech(k, m, beta, dt)
         }
-        FirFilterType::Arkaiser => {
+        FirFilterShape::Arkaiser => {
             rkaiser::fir_design_arkaiser(k, m, beta, dt)
         }
-        FirFilterType::Rkaiser => {
+        FirFilterShape::Rkaiser => {
             rkaiser::fir_design_rkaiser(k, m, beta, dt)
         }
-        FirFilterType::Rrcos => {
+        FirFilterShape::Rrcos => {
             rrcos::fir_design_rrcos(k, m, beta, dt)
         }
-        FirFilterType::Hm3 => {
+        FirFilterShape::Hm3 => {
             hm3::fir_design_hm3(k, m, beta, dt)
         }
-        FirFilterType::Gmsktx => {
+        FirFilterShape::Gmsktx => {
             gmsk::fir_design_gmsktx(k, m, beta, dt)
         }
-        FirFilterType::Gmskrx => {
+        FirFilterShape::Gmskrx => {
             gmsk::fir_design_gmskrx(k, m, beta, dt)
         }
-        FirFilterType::Rfexp => {
+        FirFilterShape::Rfexp => {
             fnyquist::fir_design_rfexp(k, m, beta, dt)
         }
-        FirFilterType::Rfsech => {
+        FirFilterShape::Rfsech => {
             fnyquist::fir_design_rfsech(k, m, beta, dt)
         }
-        FirFilterType::Rfarcsech => {
+        FirFilterShape::Rfarcsech => {
             fnyquist::fir_design_rfarcsech(k, m, beta, dt)
         }
     }
@@ -450,7 +459,8 @@ pub fn fir_design_prototype(ftype: FirFilterType, k: usize, m: usize, beta: f32,
 /// * `theta`  : LoS component angle of arrival
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_doppler(n: usize, fd: f32, k: f32, theta: f32) -> Result<Vec<f32>> {
     let beta = 4.0;
     let mut h = vec![0.0; n];
@@ -480,7 +490,8 @@ pub fn fir_design_doppler(n: usize, fd: f32, k: f32, theta: f32) -> Result<Vec<f
 /// * `lag`    : auto-correlation lag (samples)
 ///
 /// # Returns
-/// * `f32` : auto-correlation value
+/// 
+/// Auto-correlation value
 pub fn filter_autocorr(h: &[f32], lag: isize) -> f32 {
     // auto-correlation is even symmetric
     let lag = lag.abs() as usize;
@@ -506,7 +517,8 @@ pub fn filter_autocorr(h: &[f32], lag: isize) -> f32 {
 /// * `lag`    : cross-correlation lag (samples)
 ///
 /// # Returns
-/// * `f32` : cross-correlation value
+/// 
+/// Cross-correlation value
 pub fn filter_crosscorr(h: &[f32], g: &[f32], lag: isize) -> f32 {
     // cross-correlation is odd symmetric
     if h.len() < g.len() {
@@ -554,7 +566,8 @@ pub fn filter_crosscorr(h: &[f32], g: &[f32], lag: isize) -> f32 {
 /// * `m`      : filter delay (symbols)
 ///
 /// # Returns
-/// * `(f32, f32)` : ISI RMS and maximum
+/// 
+/// A tuple of ISI RMS and maximum
 pub fn filter_isi(h: &[f32], k: usize, m: usize) -> (f32, f32) {
     let rxx0 = filter_autocorr(h, 0);
     let mut isi_rms = 0.0;
@@ -578,7 +591,8 @@ pub fn filter_isi(h: &[f32], k: usize, m: usize) -> (f32, f32) {
 /// * `nfft`   : fft size
 ///
 /// # Returns
-/// * `f32` : relative out-of-band energy
+/// 
+/// Relative out-of-band energy
 pub fn filter_energy(h: &[f32], fc: f32, nfft: usize) -> Result<f32> {
     if fc < 0.0 || fc > 0.5 {
         return Err(Error::Config(format!("cutoff frequency ({}) out of range [0, 0.5]", fc)));
@@ -619,7 +633,8 @@ pub fn filter_energy(h: &[f32], fc: f32, nfft: usize) -> Result<f32> {
 /// * `fc`     : center frequency for analysis, -0.5 <= fc <= 0.5
 ///
 /// # Returns
-/// * `Complex32` : frequency response value
+/// 
+/// A frequency response value
 pub fn freqrespf(h: &[f32], fc: f32) -> Result<Complex32> {
     freqresponse(h, fc)
 }
@@ -632,7 +647,8 @@ pub fn freqrespf(h: &[f32], fc: f32) -> Result<Complex32> {
 /// * `fc`     : center frequency for analysis, -0.5 <= fc <= 0.5
 ///
 /// # Returns
-/// * `Complex32` : frequency response value
+/// 
+/// A frequency response value
 pub fn freqrespcf(h: &[Complex32], fc: f32) -> Result<Complex32> {
     freqresponse(h, fc)
 }
@@ -645,7 +661,8 @@ pub fn freqrespcf(h: &[Complex32], fc: f32) -> Result<Complex32> {
 /// * `fc`     : center frequency for analysis, -0.5 <= fc <= 0.5
 ///
 /// # Returns
-/// * `Complex32` : frequency response value
+/// 
+/// A frequency response value
 pub fn freqresponse<T: ComplexFloat>(h: &[T], fc: f32) -> Result<Complex32> where Complex32: From<T> {
     let mut h_res = Complex32::new(0.0, 0.0);
     let fc = fc as f64;
@@ -665,7 +682,8 @@ pub fn freqresponse<T: ComplexFloat>(h: &[T], fc: f32) -> Result<Complex32> wher
 /// * `fc`     : frequency at which delay is evaluated (-0.5 < fc < 0.5)
 ///
 /// # Returns
-/// * `f32` : group delay value
+/// 
+/// Group delay value
 pub fn fir_group_delay(h: &[f32], fc: f32) -> Result<f32> {
     // validate input
     if h.is_empty() {
@@ -696,7 +714,7 @@ mod tests {
     use crate::fft::{fft_run, Direction};
 
     fn test_harness_matched_filter(
-        filter_type: FirFilterType,
+        filter_type: FirFilterShape,
         k: usize,
         m: usize,
         beta: f32,
@@ -733,19 +751,19 @@ mod tests {
     #[test]
     #[autotest_annotate(autotest_firdes_rrcos)]
     fn test_firdes_rrcos() {
-        test_harness_matched_filter(FirFilterType::Rrcos, 2, 10, 0.3, -60.0, -40.0);
+        test_harness_matched_filter(FirFilterShape::Rrcos, 2, 10, 0.3, -60.0, -40.0);
     }
 
     #[test]
     #[autotest_annotate(autotest_firdes_rkaiser)]
     fn test_firdes_rkaiser() {
-        test_harness_matched_filter(FirFilterType::Rkaiser, 2, 10, 0.3, -60.0, -70.0);
+        test_harness_matched_filter(FirFilterShape::Rkaiser, 2, 10, 0.3, -60.0, -70.0);
     }
 
     #[test]
     #[autotest_annotate(autotest_firdes_arkaiser)]
     fn test_firdes_arkaiser() {
-        test_harness_matched_filter(FirFilterType::Arkaiser, 2, 10, 0.3, -60.0, -70.0);
+        test_harness_matched_filter(FirFilterShape::Arkaiser, 2, 10, 0.3, -60.0, -70.0);
     }
 
     #[test]
@@ -816,21 +834,21 @@ mod tests {
     fn test_liquid_getopt_str2firfilt() {
         // TODO maybe allow an unknown filter type/enum
         // assert_eq!(liquid_getopt_str2firfilt("unknown").unwrap(), FirdesFilterType::Unknown);
-        assert_eq!(FirFilterType::from_str("kaiser").unwrap(), FirFilterType::Kaiser);
-        assert_eq!(FirFilterType::from_str("pm").unwrap(), FirFilterType::Pm);
-        assert_eq!(FirFilterType::from_str("rcos").unwrap(), FirFilterType::Rcos);
-        assert_eq!(FirFilterType::from_str("fexp").unwrap(), FirFilterType::Fexp);
-        assert_eq!(FirFilterType::from_str("fsech").unwrap(), FirFilterType::Fsech);
-        assert_eq!(FirFilterType::from_str("farcsech").unwrap(), FirFilterType::Farcsech);
-        assert_eq!(FirFilterType::from_str("arkaiser").unwrap(), FirFilterType::Arkaiser);
-        assert_eq!(FirFilterType::from_str("rkaiser").unwrap(), FirFilterType::Rkaiser);
-        assert_eq!(FirFilterType::from_str("rrcos").unwrap(), FirFilterType::Rrcos);
-        assert_eq!(FirFilterType::from_str("hm3").unwrap(), FirFilterType::Hm3);
-        assert_eq!(FirFilterType::from_str("gmsktx").unwrap(), FirFilterType::Gmsktx);
-        assert_eq!(FirFilterType::from_str("gmskrx").unwrap(), FirFilterType::Gmskrx);
-        assert_eq!(FirFilterType::from_str("rfexp").unwrap(), FirFilterType::Rfexp);
-        assert_eq!(FirFilterType::from_str("rfsech").unwrap(), FirFilterType::Rfsech);
-        assert_eq!(FirFilterType::from_str("rfarcsech").unwrap(), FirFilterType::Rfarcsech);
+        assert_eq!(FirFilterShape::from_str("kaiser").unwrap(), FirFilterShape::Kaiser);
+        assert_eq!(FirFilterShape::from_str("pm").unwrap(), FirFilterShape::Pm);
+        assert_eq!(FirFilterShape::from_str("rcos").unwrap(), FirFilterShape::Rcos);
+        assert_eq!(FirFilterShape::from_str("fexp").unwrap(), FirFilterShape::Fexp);
+        assert_eq!(FirFilterShape::from_str("fsech").unwrap(), FirFilterShape::Fsech);
+        assert_eq!(FirFilterShape::from_str("farcsech").unwrap(), FirFilterShape::Farcsech);
+        assert_eq!(FirFilterShape::from_str("arkaiser").unwrap(), FirFilterShape::Arkaiser);
+        assert_eq!(FirFilterShape::from_str("rkaiser").unwrap(), FirFilterShape::Rkaiser);
+        assert_eq!(FirFilterShape::from_str("rrcos").unwrap(), FirFilterShape::Rrcos);
+        assert_eq!(FirFilterShape::from_str("hm3").unwrap(), FirFilterShape::Hm3);
+        assert_eq!(FirFilterShape::from_str("gmsktx").unwrap(), FirFilterShape::Gmsktx);
+        assert_eq!(FirFilterShape::from_str("gmskrx").unwrap(), FirFilterShape::Gmskrx);
+        assert_eq!(FirFilterShape::from_str("rfexp").unwrap(), FirFilterShape::Rfexp);
+        assert_eq!(FirFilterShape::from_str("rfsech").unwrap(), FirFilterShape::Rfsech);
+        assert_eq!(FirFilterShape::from_str("rfarcsech").unwrap(), FirFilterShape::Rfarcsech);
     }
 
     #[test]
@@ -888,7 +906,7 @@ mod tests {
         assert!(filter_energy(&h, 0.7, 1200).is_err());
         assert!(filter_energy(&h, 0.3, 0).is_err());
 
-        assert!(FirFilterType::from_str("unknown-filter-type").is_err());
+        assert!(FirFilterShape::from_str("unknown-filter-type").is_err());
     }
 
     #[test]
@@ -919,7 +937,7 @@ mod tests {
 
     fn testbench_firdes_prototype(filter_type: &str, k: usize, m: usize, beta: f32, as_: f32) {
         // design filter
-        let ftype = FirFilterType::from_str(filter_type).unwrap();
+        let ftype = FirFilterShape::from_str(filter_type).unwrap();
         let mut h = fir_design_prototype(ftype, k, m, beta, 0.0).unwrap();
 
         // scale by samples per symbol

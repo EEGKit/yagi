@@ -11,7 +11,8 @@ use crate::math::windows;
 /// * `mu`     : fractional sample offset, -0.5 < mu < 0.5
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_kaiser(n: usize, fc: f32, as_: f32, mu: f32) -> Result<Vec<f32>> {
     // validate input
     if mu <= -0.5 || mu > 0.5 {
@@ -56,7 +57,8 @@ pub fn fir_design_kaiser(n: usize, fc: f32, as_: f32, mu: f32) -> Result<Vec<f32
 /// * `as_`    : target filter's stop-band attenuation [dB], as_ > 0
 ///
 /// # Returns
-/// * `f32` : Kaiser window beta factor
+/// 
+/// Kaiser window beta factor
 pub fn kaiser_beta_stopband_attenuation(as_: f32) -> f32 {
     // [Vaidyanathan:1993]
     let as_abs = as_.abs();

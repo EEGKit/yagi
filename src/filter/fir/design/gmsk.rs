@@ -15,7 +15,8 @@ use num_complex::Complex32;
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_gmsktx(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // validate input
     if k < 1 {
@@ -60,7 +61,8 @@ pub fn fir_design_gmsktx(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_gmskrx(k: usize, m: usize, beta: f32, _dt: f32) -> Result<Vec<f32>> {
     // validate input
     if k < 1 {
@@ -78,7 +80,7 @@ pub fn fir_design_gmskrx(k: usize, m: usize, beta: f32, _dt: f32) -> Result<Vec<
     // internal options
     let beta = bt;                // prototype filter cut-off
     let delta = 1e-3;             // filter design correction factor
-    let prototype = design::FirFilterType::Kaiser;    // Nyquist prototype
+    let prototype = design::FirFilterShape::Kaiser;    // Nyquist prototype
 
     // derived values
     let h_len = 2 * k * m + 1;   // filter length

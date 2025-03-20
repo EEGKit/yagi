@@ -3,7 +3,7 @@ use crate::fft::{fft_run, Direction};
 
 use num_complex::Complex32;
 
-use super::FirFilterType;
+use super::FirFilterShape;
 
 // Flipped Nyquist/root-Nyquist filter designs
 //
@@ -23,9 +23,10 @@ use super::FirFilterType;
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_fnyquist(
-    ftype: FirFilterType,
+    ftype: FirFilterShape,
     root: bool,
     k: usize,
     m: usize,
@@ -52,9 +53,9 @@ pub fn fir_design_fnyquist(
 
     // compute Nyquist filter frequency response
     match ftype {
-        FirFilterType::Fexp => fir_design_fexp_freqresponse(k, m, beta, &mut h_prime)?,
-        FirFilterType::Fsech => fir_design_fsech_freqresponse(k, m, beta, &mut h_prime)?,
-        FirFilterType::Farcsech => fir_design_farcsech_freqresponse(k, m, beta, &mut h_prime)?,
+        FirFilterShape::Fexp => fir_design_fexp_freqresponse(k, m, beta, &mut h_prime)?,
+        FirFilterShape::Fsech => fir_design_fsech_freqresponse(k, m, beta, &mut h_prime)?,
+        FirFilterShape::Farcsech => fir_design_farcsech_freqresponse(k, m, beta, &mut h_prime)?,
         _ => return Err(Error::Config("unsupported filter type".into())),
     }
 
@@ -85,10 +86,11 @@ pub fn fir_design_fnyquist(
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_fexp(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // compute response using generic function
-    fir_design_fnyquist(FirFilterType::Fexp, false, k, m, beta, dt)
+    fir_design_fnyquist(FirFilterShape::Fexp, false, k, m, beta, dt)
 }
 
 /// Design fexp square-root Nyquist filter
@@ -100,10 +102,11 @@ pub fn fir_design_fexp(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_rfexp(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // compute response using generic function
-    fir_design_fnyquist(FirFilterType::Fexp, true, k, m, beta, dt)
+    fir_design_fnyquist(FirFilterShape::Fexp, true, k, m, beta, dt)
 }
 
 /// Flipped exponential frequency response
@@ -161,10 +164,11 @@ pub fn fir_design_fexp_freqresponse(k: usize, _m: usize, beta: f32, h: &mut [f32
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_fsech(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // compute response using generic function
-    fir_design_fnyquist(FirFilterType::Fsech, false, k, m, beta, dt)
+    fir_design_fnyquist(FirFilterShape::Fsech, false, k, m, beta, dt)
 }
 
 /// Design fsech square-root Nyquist filter
@@ -176,10 +180,11 @@ pub fn fir_design_fsech(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f3
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_rfsech(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // compute response using generic function
-    fir_design_fnyquist(FirFilterType::Fsech, true, k, m, beta, dt)
+    fir_design_fnyquist(FirFilterShape::Fsech, true, k, m, beta, dt)
 }
 
 /// Flipped sech frequency response
@@ -237,10 +242,11 @@ pub fn fir_design_fsech_freqresponse(k: usize, _m: usize, beta: f32, h: &mut [f3
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_farcsech(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // compute response using generic function
-    fir_design_fnyquist(FirFilterType::Farcsech, false, k, m, beta, dt)
+    fir_design_fnyquist(FirFilterShape::Farcsech, false, k, m, beta, dt)
 }
 
 /// Design farcsech square-root Nyquist filter
@@ -252,10 +258,11 @@ pub fn fir_design_farcsech(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec
 /// * `dt`     : fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_rfarcsech(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // compute response using generic function
-    fir_design_fnyquist(FirFilterType::Farcsech, true, k, m, beta, dt)
+    fir_design_fnyquist(FirFilterShape::Farcsech, true, k, m, beta, dt)
 }
 
 /// hyperbolic arc-secant
@@ -264,7 +271,8 @@ pub fn fir_design_rfarcsech(k: usize, m: usize, beta: f32, dt: f32) -> Result<Ve
 /// * `z`      : input value
 ///
 /// # Returns
-/// * `f32` : output value
+/// 
+/// hyperbolic arc-secant
 fn asechf(z: f32) -> f32 {
     if z <= 0.0 || z > 1.0 {
         return 0.0;

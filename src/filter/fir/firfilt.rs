@@ -3,26 +3,63 @@ use crate::dotprod::DotProd;
 use crate::filter;
 use std::collections::VecDeque;
 use std::f32::consts::PI;
-use std::marker::PhantomData;
 use num_complex::{ComplexFloat, Complex32};
 
+/// Finite impulse response (FIR) filter
 #[derive(Debug, Clone)]
-pub struct FirFilt<T, Coeff = T> {
+pub struct FirFilter<T, Coeff = T> {
     h: Vec<Coeff>,
     h_len: usize,
     w: VecDeque<T>,
     scale: Coeff,
-    _phantom: PhantomData<T>,
 }
 
-impl<T, Coeff> FirFilt<T, Coeff>
+/// Trait for FirFilter to implement notch filter design
+pub trait ComplexNotch
+where
+    Self: Sized,
+{
+    fn notch(m: usize, as_: f32, f0: f32) -> Result<Vec<Self>>;
+}
+
+impl ComplexNotch for f32 {
+    fn notch(m: usize, as_: f32, f0: f32) -> Result<Vec<Self>> {
+        let h = filter::fir_design_notch(m, f0, as_)?;
+        let h_c = h.iter().map(|&x| x.into()).collect::<Vec<f32>>();
+        Ok(h_c)
+    }
+}
+
+impl ComplexNotch for Complex32 {
+    fn notch(m: usize, as_: f32, f0: f32) -> Result<Vec<Self>> {
+        // design notch filter as DC blocker, then mix to appropriate frequency 
+        let h = filter::fir_design_notch(m, 0.0, as_)?;
+        let mut h_c = h.iter().map(|&x| Complex32::new(x, 0.0)).collect::<Vec<Complex32>>();
+        for (i, h_i) in h_c.iter_mut().enumerate() {
+            let phi = 2.0 * PI * f0 * (i as f32 - m as f32);
+            *h_i = *h_i * Complex32::from_polar(1.0, phi);
+        }
+        Ok(h_c)
+    }
+}
+
+impl<T, Coeff> FirFilter<T, Coeff>
 where
     T: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<Coeff, Output = T>,
-    Coeff: Copy + Default + ComplexFloat<Real = f32>,
+    Coeff: Copy + Default + ComplexFloat<Real = f32> + ComplexNotch,
     VecDeque<T>: DotProd<Coeff, Output = T>,
     f32: Into<Coeff>,
     Complex32: From<Coeff>,
 {
+    /// create filter using coefficients directly specified in an array
+    /// 
+    /// # Arguments
+    /// 
+    /// * `h` - filter coefficients
+    /// 
+    /// # Returns
+    /// 
+    /// A new `Firfilt` object.
     pub fn new(h: &[Coeff]) -> Result<Self> {
         let h_len = h.len();
         if h_len == 0 {
@@ -34,7 +71,6 @@ where
             h_len,
             w: VecDeque::from(vec![T::default(); h_len]),
             scale: Coeff::one(),
-            _phantom: PhantomData,
         };
 
         q.reset();
@@ -73,7 +109,7 @@ where
     /// # Returns
     /// 
     /// A new `Firfilt` object.
-    pub fn new_rnyquist(ftype: filter::FirFilterType, k: usize, m: usize, beta: f32, mu: f32) -> Result<Self> {
+    pub fn new_rnyquist(ftype: filter::FirFilterShape, k: usize, m: usize, beta: f32, mu: f32) -> Result<Self> {
         let h = filter::fir_design_prototype(ftype, k, m, beta, mu)?;
         let h_c = h.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         Self::new(&h_c)
@@ -133,6 +169,27 @@ where
         Self::new(&h_c)
     }
 
+    /// create notch filter
+    /// 
+    /// # Arguments
+    /// 
+    /// * `m` - filter delay
+    /// * `as_` - stop-band attenuation
+    /// * `f0` - center frequency
+    /// 
+    /// # Returns
+    /// 
+    /// A new `Firfilt` object.
+    pub fn new_notch(m: usize, as_: f32, f0: f32) -> Result<Self> {
+        let h = Coeff::notch(m, as_, f0)?;
+        Self::new(&h)
+    }
+
+    /// set filter coefficients
+    /// 
+    /// # Arguments
+    /// 
+    /// * `h` - filter coefficients
     pub fn set_coefficients(&mut self, h: &[Coeff]) -> Result<()> {
         // aka recreate
         let n = h.len();
@@ -155,28 +212,58 @@ where
         }
     }
 
+    /// push sample into filter object's internal buffer
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - single input sample
     pub fn push(&mut self, x: T) {
         self.w.rotate_right(1);
         self.w[0] = x;
     }
 
+    /// write block of samples into filter object's internal buffer
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - buffer of input samples
     pub fn write(&mut self, x: &[T]) {
         for x_i in x.iter() {
             self.push(*x_i);
         }
     }
 
+    /// execute filter on internal buffer and coefficients
+    /// 
+    /// # Returns
+    /// 
+    /// The output sample
     pub fn execute(&self) -> T {
         let y = self.w.dotprod(&self.h);
 
         y * self.scale
     }
 
+    /// execute filter on one sample, equivalent to push() and execute()
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - single input sample
+    /// 
+    /// # Returns
+    /// 
+    /// The output sample
     pub fn execute_one(&mut self, x: T) -> T {
         self.push(x);
         self.execute()
     }
 
+    /// execute filter on block of samples
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - buffer of input samples
+    /// * `y` - buffer of output samples
     pub fn execute_block(&mut self, x: &[T], y: &mut [T]) -> Result<()> {
         if x.len() != y.len() {
             return Err(Error::Config("input and output block lengths must be equal".into()));
@@ -191,76 +278,84 @@ where
     }
 
     /// set output scaling for filter
+    /// 
+    /// # Arguments
+    /// 
+    /// * `scale` - output scaling
     pub fn set_scale(&mut self, scale: Coeff) {
         self.scale = scale;
     }
 
     /// get output scaling for filter
+    /// 
+    /// # Returns
+    /// 
+    /// The output scaling
     pub fn get_scale(&self) -> Coeff {
         self.scale
     }
 
+    /// get length of filter object (number of internal coefficients)
+    /// 
+    /// # Returns
+    /// 
+    /// The length of the filter
     pub fn get_length(&self) -> usize {
         self.h_len
     }
 
+    /// get pointer to coefficients array
+    /// 
+    /// # Returns
+    /// 
+    /// The coefficients array
     pub fn get_coefficients(&self) -> &[Coeff] {
         &self.h
     }
 
+    /// compute complex frequency response of filter object
+    /// 
+    /// # Arguments
+    /// 
+    /// * `fc` - normalized frequency for evaluation
+    /// 
+    /// # Returns
+    /// 
+    /// The frequency response
     pub fn freqresponse(&self, fc: f32) -> Complex32 {
         let h_fc = filter::freqresponse(&self.h, fc).unwrap();
         h_fc * Complex32::from(self.scale)
     }
 
+    /// compute and return group delay of filter object
+    /// 
+    /// # Arguments
+    /// 
+    /// * `fc` - frequency to evaluate
+    /// 
+    /// # Returns
+    /// 
+    /// The group delay
     pub fn groupdelay(&self, fc: f32) -> Result<f32> {
         let h = self.h.iter().map(|&x| x.re()).collect::<Vec<f32>>();
         filter::fir_group_delay(&h, fc)
     }
 }
 
-impl<T> FirFilt<T, f32>
-where
-    T: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<f32, Output = T>,
-    VecDeque<T>: DotProd<f32, Output = T>,
-{
-    pub fn new_notch(m: usize, as_: f32, f0: f32) -> Result<Self> {
-        let h = filter::fir_design_notch(m, f0, as_)?;
-        let h_c = h.iter().map(|&x| x.into()).collect::<Vec<f32>>();
-        Self::new(&h_c)
-    }
-}
-
-impl<T> FirFilt<T, Complex32>
-where
-    T: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<Complex32, Output = T>,
-    VecDeque<T>: DotProd<Complex32, Output = T>,
-{
-    pub fn new_notch(m: usize, as_: f32, f0: f32) -> Result<Self> {
-        // design notch filter as DC blocker, then mix to appropriate frequency 
-        let h = filter::fir_design_notch(m, 0.0, as_)?;
-        let mut h_c = h.iter().map(|&x| Complex32::new(x, 0.0)).collect::<Vec<Complex32>>();
-        for (i, h_i) in h_c.iter_mut().enumerate() {
-            let phi = 2.0 * PI * f0 * (i as f32 - m as f32);
-            *h_i = *h_i * Complex32::from_polar(1.0, phi);
-        }
-        Self::new(&h_c)
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use test_macro::autotest_annotate;
-    use crate::filter::fir::design::FirFilterType;
+    use crate::filter::fir::design::FirFilterShape;
     use crate::utility::test_helpers::{PsdRegion, validate_psd_firfilt, validate_psd_firfiltc};
 
     #[test]
     #[autotest_annotate(autotest_firfilt_crcf_kaiser)]
     fn test_firfilt_crcf_kaiser() {
         // design filter
-        let mut q = FirFilt::new_kaiser(51, 0.2, 60.0, 0.0).unwrap();
+        let mut q = FirFilter::new_kaiser(51, 0.2, 60.0, 0.0).unwrap();
         q.set_scale(0.4);
 
         // verify resulting spectrum
@@ -277,7 +372,7 @@ mod tests {
     #[autotest_annotate(autotest_firfilt_crcf_firdespm)]
     fn test_firfilt_crcf_firdespm() {
         // design filter
-        let mut q = FirFilt::new_firdespm(51, 0.2, 60.0).unwrap();
+        let mut q = FirFilter::new_firdespm(51, 0.2, 60.0).unwrap();
         q.set_scale(0.4);
 
         // verify resulting spectrum
@@ -294,7 +389,7 @@ mod tests {
     #[autotest_annotate(autotest_firfilt_crcf_rect)]
     fn test_firfilt_crcf_rect() {
         // design filter
-        let mut q = FirFilt::new_rect(4).unwrap();
+        let mut q = FirFilter::new_rect(4).unwrap();
         q.set_scale(0.25);
 
         // verify resulting spectrum
@@ -311,7 +406,7 @@ mod tests {
     #[autotest_annotate(autotest_firfilt_crcf_notch)]
     fn test_firfilt_crcf_notch() {
         // design filter and verify resulting spectrum
-        let q = FirFilt::<Complex32, f32>::new_notch(20, 60.0, 0.125).unwrap();
+        let q = FirFilter::<Complex32, f32>::new_notch(20, 60.0, 0.125).unwrap();
         let regions = [
             PsdRegion { fmin: -0.5,   fmax: -0.20,  pmin: -0.1, pmax: 0.1,  test_lo: true, test_hi: true },
             PsdRegion { fmin: -0.126, fmax: -0.124, pmin: 0.0,  pmax: -50.0, test_lo: false, test_hi: true },
@@ -327,7 +422,7 @@ mod tests {
     #[autotest_annotate(autotest_firfilt_cccf_notch)]
     fn test_firfilt_cccf_notch() {
         // design filter and verify resulting spectrum
-        let q = FirFilt::<Complex32, Complex32>::new_notch(20, 60.0, 0.125).unwrap();
+        let q = FirFilter::<Complex32, Complex32>::new_notch(20, 60.0, 0.125).unwrap();
         let regions = [
             PsdRegion { fmin: -0.5,   fmax: 0.06,   pmin: -0.1, pmax: 0.1,  test_lo: true, test_hi: true },
             PsdRegion { fmin: 0.124,  fmax: 0.126,  pmin: 0.0,  pmax: -50.0, test_lo: false, test_hi: true },
@@ -341,17 +436,17 @@ mod tests {
     #[autotest_annotate(autotest_firfilt_config)]
     fn test_firfilt_config() {
         // no need to check every combination
-        assert!(FirFilt::<Complex32, f32>::new(&[]).is_err());
-        assert!(FirFilt::<Complex32, f32>::new_kaiser(0, 0.0, 0.0, 0.0).is_err());
-        assert!(FirFilt::<Complex32, f32>::new_rnyquist(filter::FirFilterType::Arkaiser, 0, 0, 0.0, 4.0).is_err());
-        assert!(FirFilt::<Complex32, f32>::new_firdespm(0, 0.0, 0.0).is_err());
-        assert!(FirFilt::<Complex32, f32>::new_rect(0).is_err());
-        assert!(FirFilt::<Complex32, f32>::new_dc_blocker(0, 0.0).is_err());
-        assert!(FirFilt::<Complex32, f32>::new_notch(0, 0.0, 0.0).is_err());
-        assert!(FirFilt::<Complex32, Complex32>::new_notch(0, 0.0, 0.0).is_err());
+        assert!(FirFilter::<Complex32, f32>::new(&[]).is_err());
+        assert!(FirFilter::<Complex32, f32>::new_kaiser(0, 0.0, 0.0, 0.0).is_err());
+        assert!(FirFilter::<Complex32, f32>::new_rnyquist(filter::FirFilterShape::Arkaiser, 0, 0, 0.0, 4.0).is_err());
+        assert!(FirFilter::<Complex32, f32>::new_firdespm(0, 0.0, 0.0).is_err());
+        assert!(FirFilter::<Complex32, f32>::new_rect(0).is_err());
+        assert!(FirFilter::<Complex32, f32>::new_dc_blocker(0, 0.0).is_err());
+        assert!(FirFilter::<Complex32, f32>::new_notch(0, 0.0, 0.0).is_err());
+        assert!(FirFilter::<Complex32, Complex32>::new_notch(0, 0.0, 0.0).is_err());
 
         // create proper object and test configurations
-        let mut q = FirFilt::<Complex32, f32>::new_kaiser(11, 0.2, 60.0, 0.0).unwrap();
+        let mut q = FirFilter::<Complex32, f32>::new_kaiser(11, 0.2, 60.0, 0.0).unwrap();
 
         // assert!(q.print().is_ok());
 
@@ -372,7 +467,7 @@ mod tests {
             h0[i] = (0.3 * i as f32).cos() + (2.0f32.sqrt() * i as f32).sin();
         }
 
-        let mut q = FirFilt::new(&h0).unwrap();
+        let mut q = FirFilter::new(&h0).unwrap();
 
         // assert!(q.print().is_ok());
         q.set_scale(3.0);
@@ -418,8 +513,8 @@ mod tests {
     #[autotest_annotate(autotest_firfilt_push_write)]
     fn test_firfilt_push_write() {
         // create two identical objects
-        let mut q0 = FirFilt::<f32, f32>::new_kaiser(51, 0.2, 60.0, 0.0).unwrap();
-        let mut q1 = FirFilt::<f32, f32>::new_kaiser(51, 0.2, 60.0, 0.0).unwrap();
+        let mut q0 = FirFilter::<f32, f32>::new_kaiser(51, 0.2, 60.0, 0.0).unwrap();
+        let mut q1 = FirFilter::<f32, f32>::new_kaiser(51, 0.2, 60.0, 0.0).unwrap();
 
         // generate pseudo-random inputs, and compare outputs
         let buf: [f32; 8] = [-1.0, 3.0, 5.0, -3.0, 5.0, 1.0, -3.0, -4.0];
@@ -446,7 +541,7 @@ mod tests {
     #[autotest_annotate(autotest_firfilt_crcf_copy)]
     fn test_firfilt_crcf_copy() {
         // design filter from prototype
-        let mut filt_orig = FirFilt::<Complex32, f32>::new_kaiser(21, 0.345, 60.0, 0.0).unwrap();
+        let mut filt_orig = FirFilter::<Complex32, f32>::new_kaiser(21, 0.345, 60.0, 0.0).unwrap();
         filt_orig.set_scale(2.0);
 
         // start running input through filter
@@ -497,7 +592,7 @@ mod tests {
         let h_len = 2 * m + 1;  // filter length
 
         // design filter from prototype
-        let mut q = FirFilt::<Complex32, Complex32>::new_notch(m, as_, f0).unwrap();
+        let mut q = FirFilter::<Complex32, Complex32>::new_notch(m, as_, f0).unwrap();
 
         // generate input signal
         let mut x2 = 0.0f32;
@@ -565,7 +660,7 @@ mod tests {
         }
 
         // design filter from external coefficients
-        let mut q = FirFilt::<Complex32, Complex32>::new(&h0).unwrap();
+        let mut q = FirFilter::<Complex32, Complex32>::new(&h0).unwrap();
 
         // set scale: note that this is not used when computing coefficients
         q.set_scale(Complex32::new(-0.4, 0.7));
@@ -589,7 +684,7 @@ mod tests {
         // No need to explicitly destroy filter object or free memory in Rust
     }
 
-    fn testbench_firfilt_rnyquist(ftype: FirFilterType, // filter type
+    fn testbench_firfilt_rnyquist(ftype: FirFilterShape, // filter type
                                   k: usize,             // samples/symbol
                                   m: usize,             // semi-length
                                   beta: f32,            // excess bandwidth factor
@@ -605,8 +700,8 @@ mod tests {
         let ht = filter::fir_design_prototype(ftype, k, m, beta, dt).unwrap();
 
         // special case for GMSK
-        let hr = if ftype == FirFilterType::Gmsktx {
-            filter::fir_design_prototype(filter::FirFilterType::Gmskrx, k, m, beta, dt).unwrap()
+        let hr = if ftype == FirFilterShape::Gmsktx {
+            filter::fir_design_prototype(filter::FirFilterShape::Gmskrx, k, m, beta, dt).unwrap()
         } else {
             ht.clone()
         };
@@ -640,76 +735,76 @@ mod tests {
     // test different filter designs, nominal parameters
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_arkaiser)]
-    fn test_firfilt_rnyquist_baseline_arkaiser() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_arkaiser() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rkaiser)]
-    fn test_firfilt_rnyquist_baseline_rkaiser() { testbench_firfilt_rnyquist(FirFilterType::Rkaiser, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rkaiser() { testbench_firfilt_rnyquist(FirFilterShape::Rkaiser, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rrc)]
-    fn test_firfilt_rnyquist_baseline_rrc() { testbench_firfilt_rnyquist(FirFilterType::Rrcos, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rrc() { testbench_firfilt_rnyquist(FirFilterShape::Rrcos, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_hm3)]
-    fn test_firfilt_rnyquist_baseline_hm3() { testbench_firfilt_rnyquist(FirFilterType::Hm3, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_hm3() { testbench_firfilt_rnyquist(FirFilterShape::Hm3, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_gmsktxrx)]
-    fn test_firfilt_rnyquist_baseline_gmsktxrx() { testbench_firfilt_rnyquist(FirFilterType::Gmsktx, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_gmsktxrx() { testbench_firfilt_rnyquist(FirFilterShape::Gmsktx, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rfexp)]
-    fn test_firfilt_rnyquist_baseline_rfexp() { testbench_firfilt_rnyquist(FirFilterType::Rfexp, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rfexp() { testbench_firfilt_rnyquist(FirFilterShape::Rfexp, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rfsech)]
-    fn test_firfilt_rnyquist_baseline_rfsech() { testbench_firfilt_rnyquist(FirFilterType::Rfsech, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rfsech() { testbench_firfilt_rnyquist(FirFilterShape::Rfsech, 2, 9, 0.3, 0.0); }
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_baseline_rfarcsech)]
-    fn test_firfilt_rnyquist_baseline_rfarcsech() { testbench_firfilt_rnyquist(FirFilterType::Rfarcsech, 2, 9, 0.3, 0.0); }
+    fn test_firfilt_rnyquist_baseline_rfarcsech() { testbench_firfilt_rnyquist(FirFilterShape::Rfarcsech, 2, 9, 0.3, 0.0); }
 
     // test different parameters
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_0)]
-    fn test_firfilt_rnyquist_0() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 4, 0.33, 0.0); } // short length
+    fn test_firfilt_rnyquist_0() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 2, 4, 0.33, 0.0); } // short length
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_1)]
-    fn test_firfilt_rnyquist_1() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 12, 0.20, 0.0); } // longer length
+    fn test_firfilt_rnyquist_1() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 2, 12, 0.20, 0.0); } // longer length
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_2)]
-    fn test_firfilt_rnyquist_2() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 40, 0.20, 0.0); } // very long length
+    fn test_firfilt_rnyquist_2() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 2, 40, 0.20, 0.0); } // very long length
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_3)]
-    fn test_firfilt_rnyquist_3() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 3, 12, 0.20, 0.0); } // k=3
+    fn test_firfilt_rnyquist_3() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 3, 12, 0.20, 0.0); } // k=3
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_4)]
-    fn test_firfilt_rnyquist_4() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 4, 12, 0.20, 0.0); } // k=4
+    fn test_firfilt_rnyquist_4() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 4, 12, 0.20, 0.0); } // k=4
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_5)]
-    fn test_firfilt_rnyquist_5() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 5, 12, 0.20, 0.0); } // k=5
+    fn test_firfilt_rnyquist_5() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 5, 12, 0.20, 0.0); } // k=5
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_6)]
-    fn test_firfilt_rnyquist_6() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 20, 12, 0.20, 0.0); } // k=20
+    fn test_firfilt_rnyquist_6() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 20, 12, 0.20, 0.0); } // k=20
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_7)]
-    fn test_firfilt_rnyquist_7() { testbench_firfilt_rnyquist(FirFilterType::Arkaiser, 2, 12, 0.80, 0.0); } // large excess bandwidth
+    fn test_firfilt_rnyquist_7() { testbench_firfilt_rnyquist(FirFilterShape::Arkaiser, 2, 12, 0.80, 0.0); } // large excess bandwidth
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_8)]
-    fn test_firfilt_rnyquist_8() { testbench_firfilt_rnyquist(FirFilterType::Rkaiser, 2, 12, 0.20, 0.5); } // iterative design, typical
+    fn test_firfilt_rnyquist_8() { testbench_firfilt_rnyquist(FirFilterShape::Rkaiser, 2, 12, 0.20, 0.5); } // iterative design, typical
 
     #[test]
     #[autotest_annotate(autotest_firfilt_rnyquist_9)]
-    fn test_firfilt_rnyquist_9() { testbench_firfilt_rnyquist(FirFilterType::Rkaiser, 20, 40, 0.20, 0.5); } // iterative design, stressed
+    fn test_firfilt_rnyquist_9() { testbench_firfilt_rnyquist(FirFilterShape::Rkaiser, 20, 40, 0.20, 0.5); } // iterative design, stressed
 
 
     #[test]
@@ -735,7 +830,7 @@ mod tests {
         }
 
         // create filter
-        let filter = FirFilt::<f32, f32>::new(&h).unwrap();
+        let filter = FirFilter::<f32, f32>::new(&h).unwrap();
 
         // run tests again
         for i in 0..4 {
@@ -757,7 +852,7 @@ mod tests {
         let tol = 0.001f32;
 
         // load filter coefficients externally
-        let mut q = FirFilt::<f32, f32>::new(h).unwrap();
+        let mut q = FirFilter::<f32, f32>::new(h).unwrap();
 
         // allocate memory for output
         let mut y_test = vec![0.0; y.len()];
@@ -782,7 +877,7 @@ mod tests {
         let tol = 0.001f32;
 
         // load filter coefficients externally
-        let mut q = FirFilt::<Complex32, f32>::new(h).unwrap();
+        let mut q = FirFilter::<Complex32, f32>::new(h).unwrap();
 
         // allocate memory for output
         let mut y_test = vec![Complex32::new(0.0, 0.0); y.len()];
@@ -808,7 +903,7 @@ mod tests {
         let tol = 0.001f32;
 
         // load filter coefficients externally
-        let mut q = FirFilt::<Complex32, Complex32>::new(h).unwrap();
+        let mut q = FirFilter::<Complex32, Complex32>::new(h).unwrap();
 
         // allocate memory for output
         let mut y_test = vec![Complex32::new(0.0, 0.0); y.len()];

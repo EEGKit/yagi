@@ -118,17 +118,17 @@ where
 
         self.toggle = !self.toggle;
 
-        let y0 = <T as From<f32>>::from(0.5) * (yi + yq) * self.scale;
-        let y1 = <T as From<f32>>::from(0.5) * (yi - yq) * self.scale;
+        let y0 = Into::<T>::into(0.5) * (yi + yq) * self.scale;
+        let y1 = Into::<T>::into(0.5) * (yi - yq) * self.scale;
         Ok((y0, y1))
     }
 
     pub fn analyzer_execute(&mut self, x: &[T], y: &mut [T]) -> Result<()> {
-        self.w1.push(<T as From<f32>>::from(0.5) * x[0]);
+        self.w1.push(Into::<T>::into(0.5) * x[0]);
         let r = self.w1.read();
         let y1 = self.h1.dotprod(r);
 
-        self.w0.push(<T as From<f32>>::from(0.5) * x[1]);
+        self.w0.push(Into::<T>::into(0.5) * x[1]);
         let y0 = self.w0.index(self.m - 1)?.into();
 
         y[0] = (y1 + y0) * self.scale;

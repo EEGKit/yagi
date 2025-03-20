@@ -16,7 +16,8 @@ use crate::filter::fir::design;
 /// * `dt`     : filter fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// Vec of filter coefficients
 pub fn fir_design_hm3(k: usize, m: usize, beta: f32, _dt: f32) -> Result<Vec<f32>> {
     if k < 2 {
         return Err(Error::Config("k must be greater than 1".into()));

@@ -3,15 +3,27 @@ use num_complex::Complex32;
 use std::f32::consts::LN_2;
 use libm::lgammaf;
 
-// Compute analog zeros, poles, gain of low-pass Bessel
-// filter, grouping complex conjugates together. If
-// the filter order is odd, the single real pole is at
-// the end of the array.  There are no zeros for the
-// analog Bessel filter.  The gain is unity.
-//  _n      :   filter order
-//  _z      :   output analog zeros [length:  0]
-//  _p      :   output analog poles [length: _n]
-//  _k      :   output analog gain
+//
+// Bessel filter design
+//
+// References:
+//  [Bianchi:2007] G. Bianchi and R. Sorrentino, "Electronic Filter Simulation
+//      and Design." New York: McGraw-Hill, 2007.
+//  [Orchard:1965] H. J. Orchard, "The Roots of the Maximally Flat-Delay
+//      Polynomials." IEEE Transactions on Circuit Theory, September, 1965.
+//
+
+/// Compute analog zeros, poles, gain of low-pass Bessel filter, grouping complex 
+/// conjugates together. If the filter order is odd, the single real pole is at
+/// the end of the array. There are no zeros for the analog Bessel filter. The 
+/// gain is unity.
+/// 
+/// # Arguments
+/// 
+/// * `n` - filter order
+/// * `za` - output analog zeros [length: 0]
+/// * `pa` - output analog poles [length: _n]
+/// * `ka` - output analog gain
 pub fn iir_design_bessel_analog(
     n: usize,
     za: &mut Vec<Complex32>,

@@ -4,7 +4,7 @@ use crate::filter::iir::design::iir_group_delay;
 
 // Struct definition
 #[derive(Debug, Clone)]
-pub struct IirFiltSos<T, Coeff = T> {
+pub struct IirFilterSos<T, Coeff = T> {
     b: [Coeff; 3],  // feed-forward coefficients
     a: [Coeff; 3],  // feed-back coefficients
 
@@ -14,14 +14,14 @@ pub struct IirFiltSos<T, Coeff = T> {
     v: [T; 3],  // Direct form II buffer
 }
 
-impl<T, Coeff> IirFiltSos<T, Coeff>
+impl<T, Coeff> IirFilterSos<T, Coeff>
 where
     T: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<Coeff, Output = T>,
     Coeff: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<T, Output = T>,
 {
     // create iirfiltsos object
     pub fn new(b: &[Coeff; 3], a: &[Coeff; 3]) -> Result<Self> {
-        let mut filter = IirFiltSos {
+        let mut filter = IirFilterSos {
             b: [Coeff::default(); 3],
             a: [Coeff::default(); 3],
             x: [T::default(); 3],
@@ -150,8 +150,8 @@ mod tests {
         ];
     
         // create identical objects
-        let mut q0 = IirFiltSos::<f32, f32>::new(&b, &a).unwrap();
-        let mut q1 = IirFiltSos::<f32, f32>::new(&b, &a).unwrap();
+        let mut q0 = IirFilterSos::<f32, f32>::new(&b, &a).unwrap();
+        let mut q1 = IirFilterSos::<f32, f32>::new(&b, &a).unwrap();
     
         // initialize oracle; expected output (generated with octave)
         let test = [
@@ -206,8 +206,8 @@ mod tests {
         ];
     
         // create identical objects
-        let mut q0 = IirFiltSos::<f32, f32>::new(&b, &a).unwrap();
-        let mut q1 = IirFiltSos::<f32, f32>::new(&b, &a).unwrap();
+        let mut q0 = IirFilterSos::<f32, f32>::new(&b, &a).unwrap();
+        let mut q1 = IirFilterSos::<f32, f32>::new(&b, &a).unwrap();
     
         let test = [
            0.0976310729378175,
@@ -250,7 +250,7 @@ mod tests {
         let b = [0.0976310729378175f32,  0.195262145875635f32, 0.0976310729378175f32];
     
         // create base object
-        let mut q0 = IirFiltSos::<Complex32, f32>::new(&b, &a).unwrap();
+        let mut q0 = IirFilterSos::<Complex32, f32>::new(&b, &a).unwrap();
     
         // start running input through filter
         let num_samples = 80;

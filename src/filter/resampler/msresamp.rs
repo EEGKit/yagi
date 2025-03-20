@@ -175,7 +175,7 @@ mod tests {
     use crate::utility::test_helpers::{PsdRegion, validate_psd_spectrum};
     use crate::modem::modem::ModulationScheme;
     use crate::math::WindowType;
-    use crate::filter::FirFilterType;
+    use crate::filter::FirFilterShape;
 
     fn testbench_msresamp_crcf(r: f32, as_: f32) {
         // options
@@ -186,7 +186,7 @@ mod tests {
 
         // create and configure objects
         let mut q = Spgram::<Complex32>::new(nfft, WindowType::Hann, nfft/2, nfft/4).unwrap();
-        let mut gen = SymStreamR::new_linear(FirFilterType::Kaiser, r*bw, 25, 0.2, ModulationScheme::Qpsk).unwrap();
+        let mut gen = SymStreamR::new_linear(FirFilterShape::Kaiser, r*bw, 25, 0.2, ModulationScheme::Qpsk).unwrap();
         gen.set_gain((bw as f32).sqrt());
         let mut resamp = MsResamp::<Complex32, f32>::new(r, as_).unwrap();
 

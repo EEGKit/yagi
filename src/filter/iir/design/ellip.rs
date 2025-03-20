@@ -2,15 +2,25 @@ use crate::error::{Error, Result};
 use num_complex::Complex32;
 use std::f32::consts::PI;
 
-// Compute the Landen transformation of _k over _n iterations,
-//  k[n] = (k[n-1] / (1+k'[n-1]))^2
-// where
-//  k'[n-1] = sqrt(1-k[n-1]^2)
 //
-//  _k      :   elliptic modulus
-//  _n      :   number of iterations
-//  _v      :   sequence of decreasing moduli [size: _n]
-pub fn landenf(k: f32, n: usize, v: &mut [f32]) -> Result<()> {
+// Elliptic filter design
+//
+//  [Orfanidis:2006] Sophocles J. Orfanidis, "Lecture Notes on
+//      Elliptic Filter Design." 2006
+//  [Orfanidis:2005] Sophocles J. Orfanidis, source code available
+//      on www.ece.rutgers.edu/~orfanidi/hpeq
+
+/// Compute the Landen transformation of _k over _n iterations,
+///  k[n] = (k[n-1] / (1+k'[n-1]))^2
+/// where
+///  k'[n-1] = sqrt(1-k[n-1]^2)
+///
+/// # Arguments
+/// 
+/// * `k` - elliptic modulus
+/// * `n` - number of iterations
+/// * `v` - sequence of decreasing moduli [size: n]
+fn landenf(k: f32, n: usize, v: &mut [f32]) -> Result<()> {
     let mut k = k;
     for i in 0..n {
         let kp = (1.0 - k * k).sqrt();
@@ -20,13 +30,15 @@ pub fn landenf(k: f32, n: usize, v: &mut [f32]) -> Result<()> {
     Ok(())
 }
 
-// compute elliptic integral K(k) for _n recursions
-//
-//  _k      :   elliptic modulus
-//  _n      :   number of iterations
-//  _K      :   complete elliptic integral (modulus k)
-//  _Kp     :   complete elliptic integral (modulus k')
-pub fn ellipkf(k: f32, n: usize, k_out: &mut f32, kp_out: &mut f32) -> Result<()> {
+/// Compute elliptic integral K(k) for _n recursions
+///
+/// # Arguments
+/// 
+/// * `k` - elliptic modulus
+/// * `n` - number of iterations
+/// * `k_out` - complete elliptic integral (modulus k)
+/// * `kp_out` - complete elliptic integral (modulus k')
+fn ellipkf(k: f32, n: usize, k_out: &mut f32, kp_out: &mut f32) -> Result<()> {
     let kmin = 4e-4f32;
     let kmax = (1.0 - kmin * kmin).sqrt();
     
@@ -61,12 +73,18 @@ pub fn ellipkf(k: f32, n: usize, k_out: &mut f32, kp_out: &mut f32) -> Result<()
     Ok(())
 }
 
-// Compute elliptic degree using _n iterations
-//
-//  _N      :   analog filter order
-//  _k1     :   elliptic modulus for stop-band, ep/ep1
-//  _n      :   number of Landen iterations
-pub fn ellipdegf(n: f32, k1_in: f32, n_iter: usize) -> Result<f32> {
+/// Compute elliptic degree using _n iterations
+///
+/// # Arguments
+/// 
+/// * `n` - analog filter order
+/// * `k1` - elliptic modulus for stop-band, ep/ep1
+/// * `n_iter` - number of Landen iterations
+/// 
+/// # Returns
+/// 
+/// Elliptic degree
+fn ellipdegf(n: f32, k1_in: f32, n_iter: usize) -> Result<f32> {
     let mut k1 = k1_in;
     let mut k1p = k1_in;
     ellipkf(k1_in, n_iter, &mut k1, &mut k1p)?;
@@ -89,12 +107,18 @@ pub fn ellipdegf(n: f32, k1_in: f32, n_iter: usize) -> Result<f32> {
     Ok(k)
 }
 
-// complex elliptic cd() function (Jacobian elliptic cosine)
-//
-//  _u      :   vector in the complex u-plane
-//  _k      :   elliptic modulus (0 <= _k < 1)
-//  _n      :   number of Landen iterations (typically 5-6)
-pub fn ellip_cdf(u: Complex32, k: f32, n: usize) -> Complex32 {
+/// Complex elliptic cd() function (Jacobian elliptic cosine)
+///
+/// # Arguments
+/// 
+/// * `u` - vector in the complex u-plane
+/// * `k` - elliptic modulus (0 <= _k < 1)
+/// * `n` - number of Landen iterations (typically 5-6)
+/// 
+/// # Returns
+/// 
+/// Complex elliptic cd() function
+fn ellip_cdf(u: Complex32, k: f32, n: usize) -> Complex32 {
     let mut wn = (u * PI * 0.5).cos();
     let mut v = vec![0.0; n];
     landenf(k, n, &mut v).unwrap();
@@ -104,12 +128,18 @@ pub fn ellip_cdf(u: Complex32, k: f32, n: usize) -> Complex32 {
     wn
 }
 
-// complex elliptic sn() function (Jacobian elliptic sine)
-//
-//  _u      :   vector in the complex u-plane
-//  _k      :   elliptic modulus (0 <= _k < 1)
-//  _n      :   number of Landen iterations (typically 5-6)
-pub fn ellip_snf(u: Complex32, k: f32, n: usize) -> Complex32 {
+/// Complex elliptic sn() function (Jacobian elliptic sine)
+///
+/// # Arguments
+/// 
+/// * `u` - vector in the complex u-plane
+/// * `k` - elliptic modulus (0 <= _k < 1)
+/// * `n` - number of Landen iterations (typically 5-6)
+/// 
+/// # Returns
+/// 
+/// Complex elliptic sn() function
+fn ellip_snf(u: Complex32, k: f32, n: usize) -> Complex32 {
     let mut wn = (u * PI * 0.5).sin();
     let mut v = vec![0.0; n];
     landenf(k, n, &mut v).unwrap();
@@ -119,12 +149,18 @@ pub fn ellip_snf(u: Complex32, k: f32, n: usize) -> Complex32 {
     wn
 }
 
-// complex elliptic acdf() function (Jacobian elliptic arc cosine)
-//
-//  _w      :   vector in the complex u-plane
-//  _k      :   elliptic modulus (0 <= _k < 1)
-//  _n      :   number of Landen iterations (typically 5-6)
-pub fn ellip_acdf(w: Complex32, k: f32, n: usize) -> Complex32 {
+/// Complex elliptic acdf() function (Jacobian elliptic arc cosine)
+///
+/// # Arguments
+/// 
+/// * `w` - vector in the complex u-plane
+/// * `k` - elliptic modulus (0 <= _k < 1)
+/// * `n` - number of Landen iterations (typically 5-6)
+/// 
+/// # Returns
+/// 
+/// Complex elliptic acdf() function
+fn ellip_acdf(w: Complex32, k: f32, n: usize) -> Complex32 {
     let mut v = vec![0.0; n];
     landenf(k, n, &mut v).unwrap();
 
@@ -138,21 +174,33 @@ pub fn ellip_acdf(w: Complex32, k: f32, n: usize) -> Complex32 {
     u
 }
 
-// complex elliptic asnf() function (Jacobian elliptic arc sine)
-pub fn ellip_asnf(w: Complex32, k: f32, n: usize) -> Complex32 {
+/// Complex elliptic asnf() function (Jacobian elliptic arc sine)
+///
+/// # Arguments
+/// 
+/// * `w` - vector in the complex u-plane
+/// * `k` - elliptic modulus (0 <= _k < 1)
+/// * `n` - number of Landen iterations (typically 5-6)
+/// 
+/// # Returns
+/// 
+/// Complex elliptic asnf() function
+fn ellip_asnf(w: Complex32, k: f32, n: usize) -> Complex32 {
     Complex32::new(1.0, 0.0) - ellip_acdf(w, k, n)
 }
 
-// Compute analog zeros, poles, gain of low-pass elliptic
-// filter, grouping complex conjugates together. If
-// the filter order is odd, the single real pole is at the
-// end of the array.
-//  _n      :   filter order
-//  _ep     :   epsilon_p, related to pass-band ripple
-//  _es     :   epsilon_s, related to stop-band ripple
-//  _za     :   output analog zeros [length: floor(_n/2)]
-//  _pa     :   output analog poles [length: _n]
-//  _ka     :   output analog gain
+/// Compute analog zeros, poles, gain of low-pass elliptic filter, grouping 
+/// complex conjugates together. If the filter order is odd, the single real pole 
+/// is at the end of the array.
+///
+/// # Arguments
+/// 
+/// * `n` - filter order
+/// * `ep` - epsilon_p, related to pass-band ripple
+/// * `es` - epsilon_s, related to stop-band ripple
+/// * `za` - output analog zeros [length: floor(_n/2)]
+/// * `pa` - output analog poles [length: _n]
+/// * `ka` - output analog gain
 pub fn iir_design_ellip_analog(
     n: usize,
     ep: f32,
@@ -164,6 +212,8 @@ pub fn iir_design_ellip_analog(
     let fp = 1.0 / (2.0 * PI);  // pass-band cutoff
     let fs = 1.1 * fp;          // stop-band cutoff
 
+    // number of iterations for elliptic integral
+    // approximations
     let n_iter = 7;
 
     let wp = 2.0 * PI * fp;

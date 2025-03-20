@@ -2,16 +2,18 @@ use crate::error::{Error, Result};
 use num_complex::Complex32;
 use std::f32::consts::PI;
 
-// Compute analog zeros, poles, gain of low-pass Chebyshev
-// Type I filter, grouping complex conjugates together. If
-// the filter order is odd, the single real pole is at the
-// end of the array.  There are no zeros for the analog
-// Chebyshev Type I filter.
-//  _n      :   filter order
-//  _ep     :   epsilon, related to pass-band ripple
-//  _za     :   output analog zeros [length:  0]
-//  _pa     :   output analog poles [length: _n]
-//  _ka     :   output analog gain
+/// Compute analog zeros, poles, gain of low-pass Chebyshev Type I filter, grouping 
+/// complex conjugates together. If the filter order is odd, the single real pole 
+/// is at the end of the array. There are no zeros for the analog Chebyshev Type I 
+/// filter.
+/// 
+/// # Arguments
+/// 
+/// * `n` - filter order
+/// * `ep` - epsilon, related to pass-band ripple
+/// * `za` - output analog zeros [length: 0]
+/// * `pa` - output analog poles [length: _n]
+/// * `ka` - output analog gain
 pub fn iir_design_cheby1_analog(
     n: usize,
     ep: f32,

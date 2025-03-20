@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::{self, FirPfb, FirFilterType};
-use crate::filter::iir::iirfiltsos::IirFiltSos;
+use crate::filter::{self, FirPfbFilter, FirFilterShape};
+use crate::filter::iir::IirFilterSos;
 use num_complex::ComplexFloat;
 
 
@@ -11,8 +11,8 @@ pub struct Symsync<T> {
     k_out: usize,       // samples/symbol (output)
 
     npfb: usize,        // number of filters in symsync
-    mf: FirPfb<T, f32>, // matched filter
-    dmf: FirPfb<T, f32>,// derivative matched filter
+    mf: FirPfbFilter<T, f32>, // matched filter
+    dmf: FirPfbFilter<T, f32>,// derivative matched filter
     b: usize,           // filterbank index
     bf: f32,            // filterbank index (fractional)
     tau: f32,           // fractional sample offset
@@ -24,7 +24,7 @@ pub struct Symsync<T> {
     q: f32,             // timing error
     q_hat: f32,         // filtered timing error
     decim_counter: usize, // decimation counter
-    pll: IirFiltSos<f32>, // loop filter
+    pll: IirFilterSos<f32>, // loop filter
     rate_adjustment: f32, // rate adjustment factor
     is_locked: bool,    // synchronizer locked flag
 }
@@ -75,12 +75,12 @@ where
             dh[i] *= 0.06f32 / hdh_max;
         }
 
-        let mf = FirPfb::new(npfb, h, h_len)?;
-        let dmf = FirPfb::new(npfb, &dh, h_len)?;
+        let mf = FirPfbFilter::new(npfb, h, h_len)?;
+        let dmf = FirPfbFilter::new(npfb, &dh, h_len)?;
 
         let a_coeff = [1.0, 0.0, 0.0];
         let b_coeff = [0.0, 0.0, 0.0];
-        let pll = IirFiltSos::new(&b_coeff, &a_coeff)?;
+        let pll = IirFilterSos::new(&b_coeff, &a_coeff)?;
 
         let mut q = Self {
             k,
@@ -109,7 +109,7 @@ where
         Ok(q)
     }
 
-    pub fn new_rnyquist(ftype: FirFilterType, k: usize, m: usize, beta: f32, num_filters: usize) -> Result<Self> {
+    pub fn new_rnyquist(ftype: FirFilterShape, k: usize, m: usize, beta: f32, num_filters: usize) -> Result<Self> {
         if k < 2 {
             return Err(Error::Config("samples/symbol must be at least 2".into()));
         }
@@ -237,7 +237,7 @@ where
 
         while self.b < self.npfb {
             mf = self.mf.execute(self.b)?;
-            y[ny] = mf / <T as From<f32>>::from(self.k as f32);
+            y[ny] = mf / (self.k as f32).into();
 
             if self.decim_counter == self.k_out {
                 self.decim_counter = 0;
@@ -282,7 +282,7 @@ mod tests {
     use test_macro::autotest_annotate;
     use num_complex::Complex32;
     use crate::sequence::MSequence;
-    use crate::filter::FirInterp;
+    use crate::filter::FirInterpolationFilter;
     use crate::filter::resampler::resamp::Resamp;
     use crate::random::randnf;
 
@@ -291,7 +291,7 @@ mod tests {
     fn test_symsync_copy() {
         // create base object
         let mut q0 = Symsync::<Complex32>::new_rnyquist(
-            FirFilterType::Arkaiser,
+            FirFilterShape::Arkaiser,
             5,
             7,
             0.25,
@@ -346,10 +346,10 @@ mod tests {
         assert!(Symsync::<Complex32>::new(2, 12, &[], 0).is_err()); // h_len is too small
         assert!(Symsync::<Complex32>::new(2, 12, &[], 47).is_err()); // h_len is not divisible by M
 
-        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterType::Rrcos, 0, 12, 0.2, 48).is_err()); // k is too small
-        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterType::Rrcos, 2, 0, 0.2, 48).is_err()); // m is too small
-        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterType::Rrcos, 2, 12, 7.2, 48).is_err()); // beta is too large
-        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterType::Rrcos, 2, 12, 0.2, 0).is_err()); // M is too small
+        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterShape::Rrcos, 0, 12, 0.2, 48).is_err()); // k is too small
+        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterShape::Rrcos, 2, 0, 0.2, 48).is_err()); // m is too small
+        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterShape::Rrcos, 2, 12, 7.2, 48).is_err()); // beta is too large
+        assert!(Symsync::<Complex32>::new_rnyquist(FirFilterShape::Rrcos, 2, 12, 0.2, 0).is_err()); // M is too small
 
         assert!(Symsync::<Complex32>::new_kaiser(0, 12, 0.2, 48).is_err()); // k is too small
         assert!(Symsync::<Complex32>::new_kaiser(2, 0, 0.2, 48).is_err()); // m is too small
@@ -384,9 +384,9 @@ mod tests {
 
         // transmit filter type
         let ftype_tx = if method == "rnyquist" {
-            FirFilterType::Arkaiser
+            FirFilterShape::Arkaiser
         } else {
-            FirFilterType::Kaiser
+            FirFilterShape::Kaiser
         };
 
         let bt: f32 = 0.02;               // loop filter bandwidth
@@ -431,7 +431,7 @@ mod tests {
         //
 
         // design interpolating filter
-        let mut interp = FirInterp::<Complex32>::new_prototype(ftype_tx, k, m, beta, dt).unwrap();
+        let mut interp = FirInterpolationFilter::<Complex32>::new_prototype(ftype_tx, k, m, beta, dt).unwrap();
 
         // interpolate block of samples
         interp.execute_block(&s[..num_symbols as usize], &mut x[..num_samples as usize]).unwrap();
@@ -531,9 +531,9 @@ mod tests {
 
         // transmit filter type
         let ftype_tx = if method == "rnyquist" {
-            FirFilterType::Arkaiser
+            FirFilterShape::Arkaiser
         } else {
-            FirFilterType::Kaiser
+            FirFilterShape::Kaiser
         };
 
         let bt    = 0.01f32;               // loop filter bandwidth
@@ -573,7 +573,7 @@ mod tests {
         //
 
         // design interpolating filter
-        let mut interp = FirInterp::<f32>::new_prototype(ftype_tx, k, m, beta, dt).unwrap();
+        let mut interp = FirInterpolationFilter::<f32>::new_prototype(ftype_tx, k, m, beta, dt).unwrap();
 
         // interpolate block of samples
         interp.execute_block(&s[..num_symbols], &mut x).unwrap();

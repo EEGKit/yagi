@@ -7,15 +7,16 @@ use crate::matrix::FloatComplex;
 use num_complex::Complex32;
 
 
+/// Finite impulse response (FIR) decimation filter
 #[derive(Clone, Debug)]
-pub struct FirDecim<T, Coeff = T> {
+pub struct FirDecimationFilter<T, Coeff = T> {
     h: Vec<Coeff>,
     decimation_factor: usize,
     w: Window<T>,
     scale: Coeff,
 }
 
-impl<T, Coeff> FirDecim<T, Coeff>
+impl<T, Coeff> FirDecimationFilter<T, Coeff>
 where
     T: Clone + Copy + FloatComplex<Real = f32>,
     Coeff: Clone + Copy + FloatComplex<Real = f32>,
@@ -23,6 +24,17 @@ where
     Complex32: From<Coeff>,
     [Coeff]: DotProd<T, Output = T>,
 {
+    /// Create a new decimation filter from external coefficients
+    /// 
+    /// # Arguments
+    /// 
+    /// * `decimation_factor` - The decimation factor
+    /// * `h` - The filter coefficients
+    /// * `h_len` - The length of the filter coefficients
+    /// 
+    /// # Returns
+    /// 
+    /// A new decimation filter
     pub fn new(decimation_factor: usize, h: &[Coeff], h_len: usize) -> Result<Self> {
         if h_len == 0 {
             return Err(Error::Config("filter length must be greater than zero".into()));
@@ -44,6 +56,17 @@ where
         Ok(q)
     }
 
+    /// Create a new decimation filter from a Kaiser-Bessel filter prototype
+    /// 
+    /// # Arguments
+    /// 
+    /// * `decimation_factor` - The decimation factor
+    /// * `m` - The filter delay
+    /// * `as_` - The stop-band attenuation
+    /// 
+    /// # Returns
+    /// 
+    /// A new decimation filter
     pub fn new_kaiser(decimation_factor: usize, m: usize, as_: f32) -> Result<Self> {
         if decimation_factor < 2 {
             return Err(Error::Config("decim factor must be greater than 1".into()));
@@ -63,7 +86,20 @@ where
         Self::new(decimation_factor, &hc, h_len)
     }
 
-    pub fn new_prototype(filter_type: design::FirFilterType, decimation_factor: usize, m: usize, beta: f32, dt: f32) -> Result<Self> {
+    /// Create a new decimation filter from a filter prototype
+    /// 
+    /// # Arguments
+    /// 
+    /// * `filter_type` - The filter type
+    /// * `decimation_factor` - The decimation factor
+    /// * `m` - The filter delay
+    /// * `beta` - The excess bandwidth factor
+    /// * `dt` - The fractional sample delay
+    /// 
+    /// # Returns
+    /// 
+    /// A new decimation filter
+    pub fn new_prototype(filter_type: design::FirFilterShape, decimation_factor: usize, m: usize, beta: f32, dt: f32) -> Result<Self> {
         if decimation_factor < 2 {
             return Err(Error::Config("decimation factor must be greater than 1".into()));
         }
@@ -84,28 +120,62 @@ where
         Self::new(decimation_factor, &hc, h_len)
     }
 
+    /// Reset the filter state
     pub fn reset(&mut self) {
         self.w.reset();
     }
 
+    /// Get the decimation rate
+    /// 
+    /// # Returns
+    /// 
+    /// The decimation rate
     pub fn get_decim_rate(&self) -> usize {
         self.decimation_factor
     }
 
+    /// Set the output scaling for the filter
+    /// 
+    /// # Arguments
+    /// 
+    /// * `scale` - The scaling factor
     pub fn set_scale(&mut self, scale: Coeff) {
         self.scale = scale;
     }
 
+    /// Get the output scaling for the filter
+    /// 
+    /// # Returns
+    /// 
+    /// The scaling factor
     pub fn get_scale(&self) -> Coeff {
         self.scale
     }
 
+    /// Compute the frequency response of the filter at a given frequency
+    /// 
+    /// # Arguments
+    /// 
+    /// * `fc` - The normalized frequency
+    /// 
+    /// # Returns
+    /// 
+    /// The frequency response
     pub fn freqresp(&self, fc: f32) -> Result<Complex32> {
         let mut h_freq = design::freqresponse(&self.h, fc)?;
         h_freq *= Complex32::from(self.scale);
         Ok(h_freq)
     }
 
+    /// Execute the filter on `decimation_factor` input samples
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - The input samples
+    /// 
+    /// # Returns
+    /// 
+    /// The output sample
     pub fn execute(&mut self, x: &[T]) -> Result<T> {
         let mut y = T::zero();
         for i in 0..self.decimation_factor {
@@ -120,6 +190,13 @@ where
         Ok(y)
     }
 
+    /// Execute the filter on a block of input samples
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - The input samples (size: `n * decimation_factor`)
+    /// * `n` - The number of output samples
+    /// * `y` - The output samples (destination) (size: `n`)
     pub fn execute_block(&mut self, x: &[T], n: usize, y: &mut [T]) -> Result<()> {
         for i in 0..n {
             y[i] = self.execute(&x[i * self.decimation_factor..(i + 1) * self.decimation_factor])?;
@@ -134,7 +211,7 @@ mod tests {
     use test_macro::autotest_annotate;
     use approx::assert_relative_eq;
     use crate::math::WindowType;
-    use crate::filter::fir::design::FirFilterType;
+    use crate::filter::fir::design::FirFilterShape;
 
     #[test]
     #[autotest_annotate(autotest_firdecim_config)]
@@ -147,21 +224,21 @@ mod tests {
         let h = design::fir_design_windowf(wtype, h_len, 0.2, 0.0).unwrap();
 
         // check that estimate methods return None for invalid configs
-        assert!(FirDecim::<Complex32, f32>::new(0, &h, h_len).is_err()); // M cannot be 0
-        assert!(FirDecim::<Complex32, f32>::new(m, &h, 0).is_err()); // h_len cannot be 0
+        assert!(FirDecimationFilter::<Complex32, f32>::new(0, &h, h_len).is_err()); // M cannot be 0
+        assert!(FirDecimationFilter::<Complex32, f32>::new(m, &h, 0).is_err()); // h_len cannot be 0
 
-        assert!(FirDecim::<Complex32, f32>::new_kaiser(1, 12, 60.0).is_err()); // M too small
-        assert!(FirDecim::<Complex32, f32>::new_kaiser(4, 0, 60.0).is_err()); // m too small
-        assert!(FirDecim::<Complex32, f32>::new_kaiser(4, 12, -2.0).is_err()); // As too small
+        assert!(FirDecimationFilter::<Complex32, f32>::new_kaiser(1, 12, 60.0).is_err()); // M too small
+        assert!(FirDecimationFilter::<Complex32, f32>::new_kaiser(4, 0, 60.0).is_err()); // m too small
+        assert!(FirDecimationFilter::<Complex32, f32>::new_kaiser(4, 12, -2.0).is_err()); // As too small
 
         // assert!(FirDecim::<Complex32, f32>::new_prototype(FirdesFilterType::Unknown, 4, 12, 0.3, 0.0).is_err());
-        assert!(FirDecim::<Complex32, f32>::new_prototype(FirFilterType::Rcos, 1, 12, 0.3, 0.0).is_err());
-        assert!(FirDecim::<Complex32, f32>::new_prototype(FirFilterType::Rcos, 4, 0, 0.3, 0.0).is_err());
-        assert!(FirDecim::<Complex32, f32>::new_prototype(FirFilterType::Rcos, 4, 12, 7.2, 0.0).is_err());
-        assert!(FirDecim::<Complex32, f32>::new_prototype(FirFilterType::Rcos, 4, 12, 0.3, 4.0).is_err());
+        assert!(FirDecimationFilter::<Complex32, f32>::new_prototype(FirFilterShape::Rcos, 1, 12, 0.3, 0.0).is_err());
+        assert!(FirDecimationFilter::<Complex32, f32>::new_prototype(FirFilterShape::Rcos, 4, 0, 0.3, 0.0).is_err());
+        assert!(FirDecimationFilter::<Complex32, f32>::new_prototype(FirFilterShape::Rcos, 4, 12, 7.2, 0.0).is_err());
+        assert!(FirDecimationFilter::<Complex32, f32>::new_prototype(FirFilterShape::Rcos, 4, 12, 0.3, 4.0).is_err());
 
         // create valid object and test configuration
-        let mut decim = FirDecim::<Complex32, f32>::new_kaiser(m, n, 60.0).unwrap();
+        let mut decim = FirDecimationFilter::<Complex32, f32>::new_kaiser(m, n, 60.0).unwrap();
         decim.set_scale(8.0);
         assert_eq!(decim.get_scale(), 8.0);
     }
@@ -178,8 +255,8 @@ mod tests {
         let mut buf_1 = vec![Complex32::new(0.0, 0.0); num_blocks]; // output (regular)
         let mut buf_2 = vec![Complex32::new(0.0, 0.0); num_blocks]; // output (block)
 
-        let mut decim = FirDecim::<Complex32, f32>::new_prototype(
-            FirFilterType::Arkaiser, m, n, beta, 0.0).unwrap();
+        let mut decim = FirDecimationFilter::<Complex32, f32>::new_prototype(
+            FirFilterShape::Arkaiser, m, n, beta, 0.0).unwrap();
 
         // create random-ish input (does not really matter what the input is
         // so long as the outputs match, but systematic for repeatability)
@@ -204,14 +281,14 @@ mod tests {
     #[test]
     #[autotest_annotate(autotest_firdecim_rrrf_common)]
     fn test_firdecim_rrrf_common() {
-        let decim = FirDecim::<f32, f32>::new_kaiser(17, 4, 60.0).unwrap();
+        let decim = FirDecimationFilter::<f32, f32>::new_kaiser(17, 4, 60.0).unwrap();
         assert_eq!(decim.get_decim_rate(), 17);
     }
 
     #[test]
     #[autotest_annotate(autotest_firdecim_crcf_common)]
     fn test_firdecim_crcf_common() {
-        let decim = FirDecim::<Complex32, f32>::new_kaiser(7, 4, 60.0).unwrap();
+        let decim = FirDecimationFilter::<Complex32, f32>::new_kaiser(7, 4, 60.0).unwrap();
         assert_eq!(decim.get_decim_rate(), 7);
     }
 
@@ -226,7 +303,7 @@ mod tests {
         let tol = 0.001f32;
 
         // load filter coefficients externally
-        let mut q = FirDecim::<f32, f32>::new(m, h, h.len()).unwrap();
+        let mut q = FirDecimationFilter::<f32, f32>::new(m, h, h.len()).unwrap();
 
         // allocate memory for output
         let mut y_test = vec![0.0; y.len()];
@@ -283,7 +360,7 @@ mod tests {
         let tol = 0.001f32;
 
         // load filter coefficients externally
-        let mut q = FirDecim::<Complex32, f32>::new(m, h, h.len()).unwrap();
+        let mut q = FirDecimationFilter::<Complex32, f32>::new(m, h, h.len()).unwrap();
 
         // allocate memory for output
         let mut y_test = vec![Complex32::new(0.0, 0.0); y.len()];
@@ -344,7 +421,7 @@ mod tests {
         let tol = 0.001f32;
 
         // load filter coefficients externally
-        let mut q = FirDecim::<Complex32, Complex32>::new(m, h, h.len()).unwrap();
+        let mut q = FirDecimationFilter::<Complex32, Complex32>::new(m, h, h.len()).unwrap();
 
         // allocate memory for output
         let mut y_test = vec![Complex32::new(0.0, 0.0); y.len()];

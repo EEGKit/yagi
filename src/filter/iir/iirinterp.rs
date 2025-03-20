@@ -1,16 +1,16 @@
-use crate::filter::iir::iirfilt::IirFilt;
-use crate::filter::iir::design::{IirdesFilterType, IirdesBandType, IirdesFormat};
+use crate::filter::iir::iirfilt::IirFilter;
+use crate::filter::iir::design::{IirFilterShape, IirBandType, IirFormat};
 use crate::error::{Error, Result};
 use num_complex::{ComplexFloat, Complex32};
 use crate::dotprod::DotProd;
 
 #[derive(Debug, Clone)]
-pub struct IirInterp<T, Coeff = T> {
+pub struct IirInterpolationFilter<T, Coeff = T> {
     m: usize,     // interpolation factor
-    iirfilt: IirFilt<T, Coeff>,  // filter object
+    iirfilt: IirFilter<T, Coeff>,  // filter object
 }
 
-impl<T, Coeff> IirInterp<T, Coeff>
+impl<T, Coeff> IirInterpolationFilter<T, Coeff>
 where
     T: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<Coeff, Output = T> + From<Coeff>,
     Coeff: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<T, Output = T> + Into<Complex32>,
@@ -25,18 +25,18 @@ where
         }
 
         // create filter
-        let iirfilt = IirFilt::new(b, a)?;
+        let iirfilt = IirFilter::new(b, a)?;
 
-        Ok(IirInterp { m, iirfilt })
+        Ok(IirInterpolationFilter { m, iirfilt })
     }
 
     // create interpolator with default Butterworth prototype
     pub fn new_default(m: usize, order: usize) -> Result<Self> {
         Self::new_prototype(
             m,
-            IirdesFilterType::Cheby2,
-            IirdesBandType::Lowpass,
-            IirdesFormat::SecondOrderSections,
+            IirFilterShape::Cheby2,
+            IirBandType::Lowpass,
+            IirFormat::SecondOrderSections,
             order,
             0.5 / (m as f32),  // fc
             0.0,               // f0
@@ -48,9 +48,9 @@ where
     // create interpolator from prototype
     pub fn new_prototype(
         m: usize,
-        ftype: IirdesFilterType,
-        btype: IirdesBandType,
-        format: IirdesFormat,
+        ftype: IirFilterShape,
+        btype: IirBandType,
+        format: IirFormat,
         order: usize,
         fc: f32,
         f0: f32,
@@ -63,12 +63,12 @@ where
         }
 
         // create filter
-        let mut iirfilt = IirFilt::new_prototype(ftype, btype, format, order, fc, f0, ap, as_)?;
+        let mut iirfilt = IirFilter::new_prototype(ftype, btype, format, order, fc, f0, ap, as_)?;
 
         // set appropriate scale
         iirfilt.set_scale(Coeff::from(m).unwrap());
 
-        Ok(IirInterp { m, iirfilt })
+        Ok(IirInterpolationFilter { m, iirfilt })
     }
 
     // copy object
@@ -127,7 +127,7 @@ mod tests {
     use crate::random::randnf;
     use crate::math::WindowType;
     use crate::fft::spgram::Spgram;
-    use crate::filter::FirFilterType;
+    use crate::filter::FirFilterShape;
     use crate::modem::modem::ModulationScheme;
     use crate::utility::test_helpers::{PsdRegion, validate_psd_spectrum};
     use crate::framing::symstreamr::SymStreamR;
@@ -141,12 +141,12 @@ mod tests {
         let tol = 0.5f32; // error tolerance [dB]
 
         // create resampler with rate interp/decim
-        let mut interp = IirInterp::<Complex32, f32>::new_default(interp_factor, order).unwrap();
+        let mut interp = IirInterpolationFilter::<Complex32, f32>::new_default(interp_factor, order).unwrap();
 
         // create and configure objects
         let mut q = Spgram::<Complex32>::new(nfft, WindowType::Hann, nfft/2, nfft/4).unwrap();
         let mut gen = SymStreamR::new_linear(
-            FirFilterType::Kaiser,
+            FirFilterShape::Kaiser,
             bw * interp_factor as f32,
             25,
             0.2,
@@ -196,7 +196,7 @@ mod tests {
     #[autotest_annotate(autotest_iirinterp_copy)]
     fn test_iirinterp_copy() {
         // create base object
-        let mut q0 = IirInterp::<Complex32, f32>::new_default(3, 7).unwrap();
+        let mut q0 = IirInterpolationFilter::<Complex32, f32>::new_default(3, 7).unwrap();
         //q0.set_scale(0.12345f32);
 
         // run samples through filter

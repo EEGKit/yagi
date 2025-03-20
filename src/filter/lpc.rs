@@ -90,12 +90,12 @@ pub fn levinson(r: &[f32], p: usize) -> Result<(Vec<f32>, Vec<f32>)> {
 mod tests {
     use super::*;
     use crate::sequence::msequence::MSequence;
-    use crate::filter::iir::iirfilt::IirFilt;
+    use crate::filter::iir::IirFilter;
     use test_macro::autotest_annotate;
     
     fn lpc_test_harness(n: usize, p: usize, fc: f32, tol: f32) -> Result<()> {
         // create filter
-        let mut lowpass = IirFilt::<f32, f32>::new_lowpass(7, fc)?;
+        let mut lowpass = IirFilter::<f32, f32>::new_lowpass(7, fc)?;
     
         // allocate memory for arrays
         let mut y = vec![0.0; n];    // input sequence (filtered noise)
@@ -118,7 +118,7 @@ mod tests {
         let mut b_lpc = a_hat.iter().map(|&a| -a).collect::<Vec<f32>>();
         a_lpc[0] = 1.0;
         b_lpc[0] = 0.0;
-        let mut lpc = IirFilt::<f32, f32>::new(&b_lpc, &a_lpc)?;
+        let mut lpc = IirFilter::<f32, f32>::new(&b_lpc, &a_lpc)?;
 
         // compute prediction error over random sequence
         let mut rmse = 0.0;

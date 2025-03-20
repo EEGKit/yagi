@@ -1,29 +1,29 @@
 use crate::error::{Error, Result};
-use crate::filter::iir::iirfilt::IirFilt;
-use crate::filter::iir::design::{IirdesFilterType, IirdesBandType, IirdesFormat};
+use crate::filter::iir::iirfilt::IirFilter;
+use crate::filter::iir::design::{IirFilterShape, IirBandType, IirFormat};
 
 use num_complex::Complex32;
 
 #[derive(Clone, Debug)]
-pub struct IirHilb {
-    filt_0: IirFilt<f32, f32>,
-    filt_1: IirFilt<f32, f32>,
+pub struct IirHilbertFilter {
+    filt_0: IirFilter<f32, f32>,
+    filt_1: IirFilter<f32, f32>,
     state: u8,
 }
 
-impl IirHilb {
-    pub fn new(ftype: IirdesFilterType, n: usize, ap: f32, as_: f32) -> Result<Self> {
+impl IirHilbertFilter {
+    pub fn new(ftype: IirFilterShape, n: usize, ap: f32, as_: f32) -> Result<Self> {
         if n == 0 {
             return Err(Error::Config("filter order must be greater than zero".into()));
         }
 
-        let btype = IirdesBandType::Lowpass;
-        let format = IirdesFormat::SecondOrderSections;
+        let btype = IirBandType::Lowpass;
+        let format = IirFormat::SecondOrderSections;
         let fc = 0.25;
         let f0 = 0.0;
 
-        let filt_0 = IirFilt::new_prototype(ftype, btype, format, n, fc, f0, ap, as_)?;
-        let filt_1 = IirFilt::new_prototype(ftype, btype, format, n, fc, f0, ap, as_)?;
+        let filt_0 = IirFilter::new_prototype(ftype, btype, format, n, fc, f0, ap, as_)?;
+        let filt_1 = IirFilter::new_prototype(ftype, btype, format, n, fc, f0, ap, as_)?;
 
         let mut q = Self {
             filt_0,
@@ -40,7 +40,7 @@ impl IirHilb {
             return Err(Error::Config("filter order must be greater than zero".into()));
         }
 
-        let ftype = IirdesFilterType::Butter;
+        let ftype = IirFilterShape::Butter;
         let ap = 0.1;
         let as_ = 60.0;
         Self::new(ftype, n, ap, as_)
@@ -182,7 +182,7 @@ mod tests {
         let m = 5;      // Transform order
 
         // create transform
-        let mut q = IirHilb::new_default(m).unwrap();
+        let mut q = IirHilbertFilter::new_default(m).unwrap();
         // q.print();
 
         let h_len = 2 * p + 1;  // pulse length
@@ -242,7 +242,7 @@ mod tests {
         let m: usize = 7;    // Transform order
 
         // create transform
-        let mut q = IirHilb::new_default(m).unwrap();
+        let mut q = IirHilbertFilter::new_default(m).unwrap();
         // q.print();
 
         let h_len: usize = 2 * p + 1; // pulse length
@@ -320,8 +320,8 @@ mod tests {
     #[autotest_annotate(autotest_iirhilbf_invalid_config)]
     fn test_iirhilbf_invalid_config() {
         // check that object returns None for invalid configurations
-        assert!(IirHilb::new(IirdesFilterType::Butter, 0, 0.1, 60.0).is_err()); // order out of range
-        assert!(IirHilb::new_default(0).is_err()); // order out of range
+        assert!(IirHilbertFilter::new(IirFilterShape::Butter, 0, 0.1, 60.0).is_err()); // order out of range
+        assert!(IirHilbertFilter::new_default(0).is_err()); // order out of range
 
         // create proper object and test configuration methods
         // let q = IirHilb::new(IirdesFilterType::Butter, 5, 0.1, 60.0).unwrap();
@@ -332,7 +332,7 @@ mod tests {
     #[autotest_annotate(autotest_iirhilbf_copy_interp)]
     fn test_iirhilbf_copy_interp() {
         // create base object
-        let mut q0 = IirHilb::new(IirdesFilterType::Ellip, 7, 0.1, 80.0).unwrap();
+        let mut q0 = IirHilbertFilter::new(IirFilterShape::Ellip, 7, 0.1, 80.0).unwrap();
 
         // run interpolator on random data
         let mut y0 = [0.0; 2];
@@ -358,7 +358,7 @@ mod tests {
     #[autotest_annotate(autotest_iirhilbf_copy_decim)]
     fn test_iirhilbf_copy_decim() {
         // create base object
-        let mut q0 = IirHilb::new(IirdesFilterType::Ellip, 7, 0.1, 80.0).unwrap();
+        let mut q0 = IirHilbertFilter::new(IirFilterShape::Ellip, 7, 0.1, 80.0).unwrap();
 
         // run decimator on random data
         let mut x = [0.0; 2];

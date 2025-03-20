@@ -7,8 +7,13 @@ use std::f32::consts::PI;
 
 use num_complex::Complex32;
 
+/// Finite impulse response (FIR) Hilbert transform
+/// 
+/// 2:1 real-to-complex decimator
+/// 
+/// 1:2 complex-to-real interpolator
 #[derive(Clone, Debug)]
-pub struct FirHilb {
+pub struct FirHilbertFilter {
     m: usize,           // filter semi-length, h_len = 4*m+1
     hq: Vec<f32>,       // quadrature filter coefficients
     w0: Window<f32>,    // input buffer (even samples)
@@ -18,8 +23,19 @@ pub struct FirHilb {
     toggle: bool,       // toggle for real-to-complex/complex-to-real operation
 }
 
-impl FirHilb {
-    pub fn create(m: usize, as_: f32) -> Result<Self> {
+impl FirHilbertFilter {
+    /// Create a new FIR Hilbert transform object with a particular filter
+    /// semi-length and desired stop-band attenuation.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `m` - filter semi-length, delay is 2*m+1
+    /// * `as_` - filter stop-band attenuation [dB]
+    /// 
+    /// # Returns
+    ///
+    /// A new FIR Hilbert transform object
+    pub fn new(m: usize, as_: f32) -> Result<Self> {
         if m < 2 {
             return Err(Error::Config("filter semi-length (m) must be at least 2".into()));
         }
@@ -30,20 +46,24 @@ impl FirHilb {
         let mut hq = vec![0.0; hq_len];
         let as_ = as_.abs();
 
+        // compute filter coefficients for half-band filter
         let mut h = filter::fir_design_kaiser(h_len, 0.25, as_, 0.0)?;
 
+        // alternate sign of non-zero elements
         for i in 0..h_len {
             let t = i as f32 - (h_len - 1) as f32 / 2.0;
             hc[i] = h[i] * Complex32::from_polar(1.0, 0.5 * PI * t);
             h[i] = hc[i].im;
         }
 
+        // resample, reverse direction
         let mut j = 0;
         for i in (1..h_len).step_by(2) {
             hq[j] = h[h_len - i - 1].clone();
             j += 1;
         }
 
+        // create windows for upper and lower polyphase filter branches
         let w0 = Window::new(2 * m)?;
         let w1 = Window::new(2 * m)?;
         let w2 = Window::new(2 * m)?;
@@ -63,6 +83,7 @@ impl FirHilb {
         Ok(q)
     }
 
+    /// Reset the internal state of the filter
     pub fn reset(&mut self) {
         self.w0.reset();
         self.w1.reset();
@@ -71,19 +92,42 @@ impl FirHilb {
         self.toggle = false;
     }
 
+    /// Execute the Hilbert transform (real-to-complex)
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - real-valued input sample
+    /// 
+    /// # Returns
+    /// 
+    /// A complex-valued output sample
     pub fn r2c_execute(&mut self, x: f32) -> Result<Complex32> {
-        let yi;
-        let yq;
+        let yi;  // in-phase component
+        let yq;  // quadrature component
 
         if !self.toggle {
+            // push sample into upper branch
             self.w0.push(x);
+
+            // upper branch (delay)
             yi = self.w0.index(self.m - 1)?;
+
+            // lower branch (filter)
             let r = self.w1.read();
+
+            // execute dot product
             yq = self.hq.dotprod(r);
         } else {
+            // push sample into lower branch
             self.w1.push(x);
+
+            // upper branch (delay)
             yi = self.w1.index(self.m - 1)?;
+
+            // lower branch (filter)
             let r = self.w0.read();
+
+            // execute dot product
             yq = self.hq.dotprod(r);
         }
 
@@ -92,20 +136,40 @@ impl FirHilb {
         Ok(Complex32::new(yi, yq))
     }
 
+    /// Execute the Hilbert transform (complex-to-real)
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - complex-valued input sample
+    /// 
+    /// # Returns
+    /// 
+    /// A tuple of two real-valued output samples
+    ///    (lower side-band retained, upper side-band retained)
     pub fn c2r_execute(&mut self, x: Complex32) -> Result<(f32, f32)> {
-        let yi;
+        let yi;  // in-phase component
         let yq;
 
         if !self.toggle {
+            // push samples into appropriate buffers
             self.w0.push(x.re);
             self.w1.push(x.im);
+
+            // delay branch
             yi = self.w0.index(self.m - 1)?;
+
+            // filter branch
             let r = self.w3.read();
             yq = self.hq.dotprod(r);
         } else {
+            // push samples into appropriate buffers
             self.w2.push(x.re);
             self.w3.push(x.im);
+
+            // delay branch
             yi = self.w2.index(self.m - 1)?;
+
+            // filter branch
             let r = self.w1.read();
             yq = self.hq.dotprod(r);
         }
@@ -115,24 +179,44 @@ impl FirHilb {
         Ok((yi + yq, yi - yq))
     }
 
+    /// Execute the Hilbert transform decimator (real-to-complex)
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - real-valued input array, [size: 2 x 1]
+    /// 
+    /// # Returns
+    /// 
+    /// A complex-valued output sample
     pub fn decim_execute(&mut self, x: &[f32]) -> Result<Complex32> {
-        let yi;
-        let yq;
+        let yi;  // in-phase component
+        let yq;  // quadrature component
 
+        // compute quadrature component (filter branch)
         self.w1.push(x[0]);
         let r = self.w1.read();
         yq = self.hq.dotprod(r);
 
+        // delay branch
         self.w0.push(x[1]);
         yi = self.w0.index(self.m - 1)?;
 
+        // set return value
         let v = Complex32::new(yi, yq);
         let y = if self.toggle { -v } else { v };
 
+        // toggle flag
         self.toggle = !self.toggle;
         Ok(y)
     }
 
+    /// Execute the Hilbert transform decimator (real-to-complex) on a block of samples
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - real-valued input array, [size: 2*n x 1]
+    /// * `n` - number of output samples
+    /// * `y` - complex-valued output array, [size: n x 1]
     pub fn decim_execute_block(&mut self, x: &[f32], n: usize, y: &mut [Complex32]) -> Result<()> {
         for i in 0..n {
             y[i] = self.decim_execute(&x[2*i..2*i+2])?;
@@ -140,13 +224,21 @@ impl FirHilb {
         Ok(())
     }
 
+    /// Execute the Hilbert transform interpolator (complex-to-real)
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - complex-valued input sample
+    /// * `y` - real-valued output array, [size: 2 x 1]
     pub fn interp_execute(&mut self, x: Complex32, y: &mut [f32]) -> Result<()> {
         let vi = if self.toggle { -x.re } else { x.re };
         let vq = if self.toggle { -x.im } else { x.im };
 
+        // compute delay branch
         self.w0.push(vq.into());
         y[0] = self.w0.index(self.m - 1)?;
 
+        // compute filter branch
         self.w1.push(vi.into());
         let r = self.w1.read();
         y[1] = self.hq.dotprod(r);
@@ -155,6 +247,13 @@ impl FirHilb {
         Ok(())
     }
 
+    /// Execute the Hilbert transform interpolator (complex-to-real) on a block of samples
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - complex-valued input array, [size: n x 1]
+    /// * `n` - number of output samples
+    /// * `y` - real-valued output array, [size: 2*n x 1]
     pub fn interp_execute_block(&mut self, x: &[Complex32], n: usize, y: &mut [f32]) -> Result<()> {
         for i in 0..n {
             self.interp_execute(x[i], &mut y[2*i..2*i+2])?;
@@ -189,7 +288,7 @@ mod tests {
 
         let mut y = [Complex32::new(0.0, 0.0); 16];
         let m = 5;   // h_len = 4*m+1 = 21
-        let mut ht = FirHilb::create(m, 60.0).unwrap();
+        let mut ht = FirHilbertFilter::new(m, 60.0).unwrap();
         let tol = 0.005;
 
         // run decimator
@@ -223,7 +322,7 @@ mod tests {
 
         let mut y = [0.0; 32];
         let m = 5;   // h_len = 4*m+1 = 21
-        let mut ht = FirHilb::create(m, 60.0).unwrap();
+        let mut ht = FirHilbertFilter::new(m, 60.0).unwrap();
         let tol = 0.005;
 
         // run interpolator
@@ -247,7 +346,7 @@ mod tests {
         let m: usize = 25;   // Transform delay
 
         // create transform
-        let mut q = FirHilb::create(m, as_).unwrap();
+        let mut q = FirHilbertFilter::new(m, as_).unwrap();
 
         let h_len: usize = 2 * p + 1; // pulse length
         let num_samples: usize = h_len + 2 * m + 8;
@@ -298,8 +397,8 @@ mod tests {
     #[autotest_annotate(autotest_firhilbf_invalid_config)]
     fn test_firhilb_invalid_config() {
         // check that object returns None for invalid configurations
-        assert!(FirHilb::create(0, 60.0).is_err()); // m too small
-        assert!(FirHilb::create(1, 60.0).is_err()); // m too small
+        assert!(FirHilbertFilter::new(0, 60.0).is_err()); // m too small
+        assert!(FirHilbertFilter::new(1, 60.0).is_err()); // m too small
 
         // create proper object but test invalid internal configurations
         // let q = FirHilb::create(12, 60.0).unwrap();
@@ -309,7 +408,7 @@ mod tests {
     #[test]
     #[autotest_annotate(autotest_firhilbf_copy_interp)]
     fn test_firhilb_copy_interp() {
-        let mut q0 = FirHilb::create(12, 120.0).unwrap();
+        let mut q0 = FirHilbertFilter::new(12, 120.0).unwrap();
 
         // run interpolator on random data
         let mut y0 = [0.0; 2];
@@ -334,7 +433,7 @@ mod tests {
     #[test]
     #[autotest_annotate(autotest_firhilbf_copy_decim)]
     fn test_firhilb_copy_decim() {
-        let mut q0 = FirHilb::create(12, 120.0).unwrap();
+        let mut q0 = FirHilbertFilter::new(12, 120.0).unwrap();
 
         // run decimator on random data
         let mut x = [0.0; 2];

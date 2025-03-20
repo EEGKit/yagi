@@ -4,15 +4,17 @@ use std::f64::consts::PI;
 
 use libm::{pow, sqrt};
 
-// Compute analog zeros, poles, gain of low-pass Chebyshev
-// Type II filter, grouping complex conjugates together. If
-// the filter order is odd, the single real pole is at the
-// end of the array.
-//  _n      :   filter order
-//  _es     :   epsilon, related to stop-band ripple
-//  _za     :   output analog zeros [length: 2*floor(_n/2)]
-//  _pa     :   output analog poles [length: _n]
-//  _ka     :   output analog gain
+/// Compute analog zeros, poles, gain of low-pass Chebyshev Type II filter, grouping 
+/// complex conjugates together. If the filter order is odd, the single real pole 
+/// is at the end of the array.
+/// 
+/// # Arguments
+/// 
+/// * `n` - filter order
+/// * `es` - epsilon, related to stop-band ripple
+/// * `za` - output analog zeros [length: 2*floor(_n/2)]
+/// * `pa` - output analog poles [length: _n]
+/// * `ka` - output analog gain
 pub fn iir_design_cheby2_analog(
     n: usize,
     es: f32,

@@ -49,7 +49,7 @@ where
     }
 
     pub fn new_rnyquist(
-        filter_type: filter::FirFilterType,
+        filter_type: filter::FirFilterShape,
         k: usize,
         m: usize,
         beta: f32,
@@ -203,7 +203,7 @@ where
 mod tests {
     use super::*;
     use test_macro::autotest_annotate;
-    use crate::filter::{FirInterp, FirFilt, FirFilterType};
+    use crate::filter::{FirInterpolationFilter, FirFilter, FirFilterShape};
     use crate::math::{sincf, hamming};
     use crate::modem::modem::{Modem, ModulationScheme};
     use crate::random::randnf;
@@ -223,7 +223,7 @@ mod tests {
     ) {
         //let tol = 0.025f32; // error tolerance
         let mut mod_ = Modem::new(ms).unwrap();
-        let mut interp = FirInterp::<Complex<f32>, f32>::new_prototype(FirFilterType::Arkaiser, k, m, beta, 0.0).unwrap();
+        let mut interp = FirInterpolationFilter::<Complex<f32>, f32>::new_prototype(FirFilterShape::Arkaiser, k, m, beta, 0.0).unwrap();
 
         // create fixed channel filter
         let h = [
@@ -233,7 +233,7 @@ mod tests {
             Complex::new(0.02, 0.01),
             Complex::new(-0.09, -0.04),
         ];
-        let mut fchannel = FirFilt::<Complex<f32>>::new(&h).unwrap();
+        let mut fchannel = FirFilter::<Complex<f32>>::new(&h).unwrap();
 
         // prototype low-pass filter
         let mut hp = vec![Complex::new(0.0, 0.0); 2 * k * p + 1];
@@ -246,7 +246,7 @@ mod tests {
 
         // create and initialize equalizer
         let mut eq = match init {
-            0 => Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, k, p, beta, 0.0),
+            0 => Eqlms::<Complex<f32>>::new_rnyquist(FirFilterShape::Arkaiser, k, p, beta, 0.0),
             1 => Eqlms::<Complex<f32>>::new_lowpass(2 * k * p + 1, 0.5 / (k as f32)),
             2 => Eqlms::<Complex<f32>>::new(Some(&hp), 2 * k * p + 1),
             _ => Eqlms::<Complex<f32>>::new(None, 2 * k * p + 1),
@@ -384,10 +384,10 @@ mod tests {
     #[autotest_annotate(autotest_eqlms_config)]
     fn autotest_eqlms_config() {
         // check that object returns None for invalid configurations
-        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, 0, 12, 0.3, 0.0).is_err());
-        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, 2, 0, 0.3, 0.0).is_err());
-        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, 2, 12, 2.0, 0.0).is_err());
-        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterType::Arkaiser, 2, 12, 0.3, -2.0).is_err());
+        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterShape::Arkaiser, 0, 12, 0.3, 0.0).is_err());
+        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterShape::Arkaiser, 2, 0, 0.3, 0.0).is_err());
+        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterShape::Arkaiser, 2, 12, 2.0, 0.0).is_err());
+        assert!(Eqlms::<Complex<f32>>::new_rnyquist(FirFilterShape::Arkaiser, 2, 12, 0.3, -2.0).is_err());
 
         assert!(Eqlms::<Complex<f32>>::new_lowpass(0, 0.1).is_err());
         assert!(Eqlms::<Complex<f32>>::new_lowpass(13, -0.1).is_err());

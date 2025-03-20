@@ -1,26 +1,35 @@
-pub mod bessel;
-pub mod butter;
-pub mod cheby1;
-pub mod cheby2;
-pub mod ellip;
-pub mod pll;
+mod bessel;
+mod butter;
+mod cheby1;
+mod cheby2;
+mod ellip;
+mod pll;
 
-pub use bessel::iir_design_bessel_analog;
-pub use butter::iir_design_butter_analog;
-pub use cheby1::iir_design_cheby1_analog;
-pub use cheby2::iir_design_cheby2_analog;
-pub use ellip::iir_design_ellip_analog;
-pub use pll::{iir_design_pll_active_lag, iir_design_pll_active_pi};
+pub use bessel::*;
+pub use butter::*;
+pub use cheby1::*;
+pub use cheby2::*;
+pub use ellip::*;
+pub use pll::*;
 
 use crate::error::{Error, Result};
 use crate::math::{poly_expandbinomial_pm, poly_expandroots, polyf_findroots};
 use num_complex::Complex32;
 use std::f32::consts::PI;
 
-use libm::powf;
 
+//
+// iir (infinite impulse response) filter design
+//
+// References
+//  [Constantinides:1967] A. G. Constantinides, "Frequency
+//      Transformations for Digital Filters." IEEE Electronic
+//      Letters, vol. 3, no. 11, pp 487-489, 1967.
+//
+
+/// IIR filter design shape
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum IirdesFilterType {
+pub enum IirFilterShape {
     Butter,
     Cheby1,
     Cheby2,
@@ -28,60 +37,70 @@ pub enum IirdesFilterType {
     Bessel,
 }
 
+/// IIR filter band type
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum IirdesBandType {
+pub enum IirBandType {
     Lowpass,
     Highpass,
     Bandpass,
     Bandstop,
 }
 
+/// IIR filter format
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum IirdesFormat {
+pub enum IirFormat {
     TransferFunction,
     SecondOrderSections,
 }
 
 
-// Sorts array _z of complex numbers into complex conjugate pairs to
-// within a tolerance. Conjugate pairs are ordered by increasing real
-// component with the negative imaginary element first. All pure-real
-// elements are placed at the end of the array.
-//
-// Example:
-//      v:              liquid_cplxpair(v):
-//      10 + j*3        -3 - j*4
-//       5 + j*0         3 + j*4
-//      -3 + j*4        10 - j*3
-//      10 - j*3        10 + j*3
-//       3 + j*0         3 + j*0
-//      -3 + j*4         5 + j*0
-// 
-//  _z      :   complex array (size _n)
-//  _n      :   number of elements in _z
-//  _tol    :   tolerance for finding complex pairs
-//  _p      :   resulting pairs, pure real values of _z at end
-pub fn find_conjugate_pairs(z: &[Complex32], n: usize, tol: f32, p: &mut [Complex32]) -> Result<()> {
+/// Sorts array _z of complex numbers into complex conjugate pairs to
+/// within a tolerance. Conjugate pairs are ordered by increasing real
+/// component with the negative imaginary element first. All pure-real
+/// elements are placed at the end of the array.
+///
+/// Example:
+///      v:              liquid_cplxpair(v):
+///      10 + j*3        -3 - j*4
+///       5 + j*0         3 + j*4
+///      -3 + j*4        10 - j*3
+///      10 - j*3        10 + j*3
+///       3 + j*0         3 + j*0
+///      -3 + j*4         5 + j*0
+/// 
+/// # Arguments
+/// 
+/// * `z` - complex array (size _n)
+/// * `n` - number of elements in _z
+/// * `tol` - tolerance for finding complex pairs
+/// * `p` - resulting pairs, pure real values of _z at end
+fn find_conjugate_pairs(z: &[Complex32], n: usize, tol: f32, p: &mut [Complex32]) -> Result<()> {
     // validate input
     if tol < 0.0 {
         return Err(Error::Range("tolerance must be positive".into()));
     }
 
+    // keep track of which elements have been paired
     let mut paired = vec![false; n];
     let mut num_pairs = 0;
     let mut k = 0;
 
     for i in 0..n {
+        // ignore value if already paired, or if imaginary
+        // component is less than tolerance
         if paired[i] || z[i].im.abs() < tol {
             continue;
         }
         
         for j in i+1..n {
+            // ignore value if already paired, or if imaginary
+            // component is less than tolerance
             if j == i || paired[j] || z[j].im.abs() < tol {
                 continue;
             }
 
             if (z[i].im + z[j].im).abs() < tol && (z[i].re - z[j].re).abs() < tol {
+                // found complex conjugate pair
                 p[k] = z[i];
                 p[k + 1] = z[j];
                 paired[i] = true;
@@ -122,19 +141,21 @@ pub fn find_conjugate_pairs(z: &[Complex32], n: usize, tol: f32, p: &mut [Comple
 }
     
 
-// post-process cleanup used with liquid_cplxpair
-//
-// once pairs have been identified and ordered, this method
-// will clean up the result by ensuring the following:
-//  * pairs are perfect conjugates
-//  * pairs have negative imaginary component first
-//  * pairs are ordered by increasing real component
-//  * pure-real elements are ordered by increasing value
-//
-//  _p          :   pre-processed complex array [size: _n x 1]
-//  _n          :   array length
-//  _num_pairs  :   number of complex conjugate pairs
-pub fn find_conjugate_pairs_cleanup(p: &mut [Complex32], n: usize, num_pairs: usize) -> Result<()> {
+/// post-process cleanup used with liquid_cplxpair
+///
+/// once pairs have been identified and ordered, this method
+/// will clean up the result by ensuring the following:
+///  * pairs are perfect conjugates
+///  * pairs have negative imaginary component first
+///  * pairs are ordered by increasing real component
+///  * pure-real elements are ordered by increasing value
+///
+/// # Arguments
+/// 
+/// * `p` - pre-processed complex array [size: _n x 1]
+/// * `n` - array length
+/// * `num_pairs` - number of complex conjugate pairs
+fn find_conjugate_pairs_cleanup(p: &mut [Complex32], n: usize, num_pairs: usize) -> Result<()> {
     // force pairs to be perfect conjugates with
     // negative imaginary component first
     for i in 0..num_pairs {
@@ -172,35 +193,46 @@ pub fn find_conjugate_pairs_cleanup(p: &mut [Complex32], n: usize, num_pairs: us
     Ok(())
 }
 
-// Compute frequency pre-warping factor.  See [Constantinides:1967]
-//  _btype  :   band type (e.g. LIQUID_IIRDES_HIGHPASS)
-//  _fc     :   low-pass cutoff frequency
-//  _f0     :   center frequency (band-pass|stop cases only)
-pub fn iir_design_freqprewarp(btype: IirdesBandType, fc: f32, f0: f32) -> f32 {
+/// Compute frequency pre-warping factor.
+/// 
+/// # Arguments
+/// 
+/// * `btype` - band type (e.g. `IirBandType::Lowpass`)
+/// * `fc` - low-pass cutoff frequency
+/// * `f0` - center frequency (band-pass|stop cases only)
+/// 
+/// # Returns
+/// 
+/// Frequency pre-warping factor
+pub fn iir_design_freqprewarp(btype: IirBandType, fc: f32, f0: f32) -> f32 {
+    // See [Constantinides:1967]
     match btype {
-        IirdesBandType::Lowpass => (PI * fc).tan(),
-        IirdesBandType::Highpass => -(PI * fc).cos() / (PI * fc).sin(),
-        IirdesBandType::Bandpass => {
+        IirBandType::Lowpass => (PI * fc).tan(),
+        IirBandType::Highpass => -(PI * fc).cos() / (PI * fc).sin(),
+        IirBandType::Bandpass => {
             ((2.0 * PI * fc).cos() - (2.0 * PI * f0).cos()) / (2.0 * PI * fc).sin()
         }
-        IirdesBandType::Bandstop => {
+        IirBandType::Bandstop => {
             (2.0 * PI * fc).sin() / ((2.0 * PI * fc).cos() - (2.0 * PI * f0).cos())
         }
     }
 }
 
-// convert analog zeros, poles, gain to digital zeros, poles gain
-//  _za     :   analog zeros (length: _nza)
-//  _pa     :   analog poles (length: _npa)
-//  _ka     :   nominal gain (NOTE: this does not necessarily carry over from analog gain)
-//  _m      :   frequency pre-warping factor
-//  _zd     :   digital zeros (length: _npa)
-//  _pd     :   digital poles (length: _npa)
-//  _kd     :   digital gain
-//
-// The filter order is characterized by the number of analog
-// poles.  The analog filter may have up to _npa zeros.
-// The number of digital zeros and poles is equal to _npa.
+/// convert analog zeros, poles, gain to digital zeros, poles gain
+/// 
+/// The filter order is characterized by the number of analog
+/// poles.  The analog filter may have up to pa.len() zeros.
+/// The number of digital zeros and poles is equal to pa.len().
+/// 
+/// # Arguments
+/// 
+/// * `za` - analog zeros
+/// * `pa` - analog poles
+/// * `ka` - nominal gain (NOTE: this does not necessarily carry over from analog gain)
+/// * `m` - frequency pre-warping factor
+/// * `zd` - digital zeros (output)
+/// * `pd` - digital poles (output)
+/// * `kd` - digital gain (output)
 pub fn iir_design_bilinear_a2d(
     za: &[Complex32],
     pa: &[Complex32],
@@ -238,26 +270,28 @@ pub fn iir_design_bilinear_a2d(
     Ok(())
 }
 
-// compute bilinear z-transform using polynomial expansion in numerator and
-// denominator
-//
-//          b[0] + b[1]*s + ... + b[nb]*s^(nb-1)
-// H(s) =   ------------------------------------
-//          a[0] + a[1]*s + ... + a[na]*s^(na-1)
-//
-// computes H(z) = H( s -> _m*(z-1)/(z+1) ) and expands as
-//
-//          bd[0] + bd[1]*z^-1 + ... + bd[nb]*z^-n
-// H(z) =   --------------------------------------
-//          ad[0] + ad[1]*z^-1 + ... + ad[nb]*z^-m
-//
-//  _b          : numerator array, [size: _b_order+1]
-//  _b_order    : polynomial order of _b
-//  _a          : denominator array, [size: _a_order+1]
-//  _a_order    : polynomial order of _a
-//  _m          : bilateral warping factor
-//  _bd         : output digital filter numerator, [size: _b_order+1]
-//  _ad         : output digital filter numerator, [size: _a_order+1]
+/// compute bilinear z-transform using polynomial expansion in numerator and
+/// denominator
+/// 
+///          b[0] + b[1]*s + ... + b[nb]*s^(nb-1)
+/// H(s) =   ------------------------------------
+///          a[0] + a[1]*s + ... + a[na]*s^(na-1)
+/// 
+/// computes H(z) = H( s -> _m*(z-1)/(z+1) ) and expands as
+/// 
+///          bd[0] + bd[1]*z^-1 + ... + bd[nb]*z^-n
+/// H(z) =   --------------------------------------
+///          ad[0] + ad[1]*z^-1 + ... + ad[nb]*z^-m
+/// 
+/// # Arguments
+/// 
+/// * `b` - numerator array, [size: _b_order+1]
+/// * `b_order` - polynomial order of _b
+/// * `a` - denominator array, [size: _a_order+1]
+/// * `a_order` - polynomial order of _a
+/// * `m` - bilateral warping factor
+/// * `bd` - output digital filter numerator, [size: _b_order+1]
+/// * `ad` - output digital filter numerator, [size: _a_order+1]
 pub fn iir_design_bilinear_z(
     b: &[Complex32],
     b_order: usize,
@@ -328,13 +362,16 @@ pub fn iir_design_bilinear_z(
     Ok(())
 }
 
-// convert discrete z/p/k form to transfer function form
-//  _zd     :   digital zeros (length: _n)
-//  _pd     :   digital poles (length: _n)
-//  _n      :   filter order
-//  _k      :   digital gain
-//  _b      :   output numerator (length: _n+1)
-//  _a      :   output denominator (length: _n+1)
+/// convert discrete z/p/k form to transfer function form
+/// 
+/// # Arguments
+/// 
+/// * `zd` - digital zeros (length: _n)
+/// * `pd` - digital poles (length: _n)
+/// * `n` - filter order
+/// * `k` - digital gain
+/// * `b` - output numerator (length: _n+1)
+/// * `a` - output denominator (length: _n+1)
 pub fn iir_design_d2tf(
     zd: &[Complex32],
     pd: &[Complex32],
@@ -360,18 +397,20 @@ pub fn iir_design_d2tf(
     Ok(())
 }
 
-// convert discrete z/p/k form to second-order sections form
-//  _zd     :   digital zeros array (size _n)
-//  _pd     :   digital poles array (size _n)
-//  _n      :   number of poles, zeros
-//  _kd     :   gain
-//
-//  _b      :   output numerator matrix (size (L+r) x 3)
-//  _a      :   output denominator matrix (size (L+r) x 3)
-//
-//  L is the number of sections in the cascade:
-//      r = _n % 2
-//      L = (_n - r) / 2;
+/// convert discrete z/p/k form to second-order sections form
+/// 
+/// L is the number of sections in the cascade:
+///      r = n % 2
+///      L = (n - r) / 2;
+/// 
+/// # Arguments
+/// 
+/// * `zd` - digital zeros (length: n)
+/// * `pd` - digital poles (length: n)
+/// * `n` - number of poles, zeros
+/// * `kd` - gain
+/// * `b` - output numerator matrix (size (L+r) x 3)
+/// * `a` - output denominator matrix (size (L+r) x 3)
 pub fn iir_design_d2sos(
     zd: &[Complex32],
     pd: &[Complex32],
@@ -452,12 +491,15 @@ pub fn iir_design_d2sos(
     Ok(())
 }
 
-// digital z/p/k low-pass to high-pass transformation
-//  _zd     :   digital zeros (low-pass prototype)
-//  _pd     :   digital poles (low-pass prototype)
-//  _n      :   low-pass filter order
-//  _zdt    :   digital zeros transformed [length: _n]
-//  _pdt    :   digital poles transformed [length: _n]
+/// digital z/p/k low-pass to high-pass transformation
+/// 
+/// # Arguments
+/// 
+/// * `zd` - digital zeros (low-pass prototype)
+/// * `pd` - digital poles (low-pass prototype)
+/// * `n` - low-pass filter order
+/// * `zdt` - output digital zeros transformed [length: n]
+/// * `pdt` - output digital poles transformed [length: n]
 pub fn iir_design_lp2hp(
     zd: &[Complex32],
     pd: &[Complex32],
@@ -473,13 +515,16 @@ pub fn iir_design_lp2hp(
     Ok(())
 }
 
-// digital z/p/k low-pass to band-pass transformation
-//  _zd     :   digital zeros (low-pass prototype)
-//  _pd     :   digital poles (low-pass prototype)
-//  _n      :   low-pass filter order
-//  _f0     :   center frequency
-//  _zdt    :   digital zeros transformed [length: 2*_n]
-//  _pdt    :   digital poles transformed [length: 2*_n]
+/// digital z/p/k low-pass to band-pass transformation
+/// 
+/// # Arguments
+/// 
+/// * `zd` - digital zeros (low-pass prototype)
+/// * `pd` - digital poles (low-pass prototype)
+/// * `n` - low-pass filter order
+/// * `f0` - center frequency
+/// * `zdt` - output digital zeros transformed [length: 2*n]
+/// * `pdt` - output digital poles transformed [length: 2*n]
 pub fn iir_design_lp2bp(
     zd: &[Complex32],
     pd: &[Complex32],
@@ -504,21 +549,24 @@ pub fn iir_design_lp2bp(
     Ok(())
 }
 
-// IIR filter design template
-//  _ftype      :   filter type (e.g. LIQUID_IIRDES_BUTTER)
-//  _btype      :   band type (e.g. LIQUID_IIRDES_BANDPASS)
-//  _format     :   coefficients format (e.g. LIQUID_IIRDES_SOS)
-//  _n          :   filter order
-//  _fc         :   low-pass prototype cut-off frequency
-//  _f0         :   center frequency (band-pass, band-stop)
-//  _ap         :   pass-band ripple in dB
-//  _as         :   stop-band ripple in dB
-//  _b          :   numerator
-//  _a          :   denominator
+/// IIR filter design template
+/// 
+/// # Arguments
+/// 
+/// * `ftype` - filter type (e.g. IirFilterShape::Butter)
+/// * `btype` - band type (e.g. IirBandType::Bandpass)
+/// * `format` - coefficients format (e.g. IirFormat::Sos)
+/// * `n` - filter order
+/// * `fc` - low-pass prototype cut-off frequency
+/// * `f0` - center frequency (band-pass, band-stop)
+/// * `ap` - pass-band ripple in dB
+/// * `as` - stop-band ripple in dB
+/// * `b` - output numerator
+/// * `a` - output denominator
 pub fn iir_design(
-    ftype: IirdesFilterType,
-    btype: IirdesBandType,
-    format: IirdesFormat,
+    ftype: IirFilterShape,
+    btype: IirBandType,
+    format: IirFormat,
     n: usize,
     fc: f32,
     f0: f32,
@@ -557,27 +605,31 @@ pub fn iir_design(
 
     // compute zeros and poles of analog prototype
     match ftype {
-        IirdesFilterType::Butter => {
+        IirFilterShape::Butter => {
+            // Butterworth filter design : no zeros, n poles
             k0 = Complex32::new(1.0, 0.0);
             if iir_design_butter_analog(order, &mut za, &mut pa, &mut ka).is_err() {
                 return Err(Error::Internal("could not design analog filter (butterworth)".into()));
             }
         },
-        IirdesFilterType::Cheby1 => {
+        IirFilterShape::Cheby1 => {
+            // Cheby-I filter design : no zeros, n poles, pass-band ripple
             let epsilon = (10.0f32.powf(ap / 10.0) - 1.0).sqrt();
             k0 = if r == 1 { Complex32::new(1.0, 0.0) } else { Complex32::new(1.0 / (1.0 + epsilon * epsilon).sqrt(), 0.0) };
             if iir_design_cheby1_analog(order, epsilon, &mut za, &mut pa, &mut ka).is_err() {
                 return Err(Error::Internal("could not design analog filter (cheby1)".into()));
             }
         },
-        IirdesFilterType::Cheby2 => {
-            let epsilon = powf(10.0f32, -as_ / 20.0);
+        IirFilterShape::Cheby2 => {
+            // Cheby-II filter design : n-r zeros, n poles, stop-band ripple
+            let epsilon = 10.0f32.powf(-as_ / 20.0);
             k0 = Complex32::new(1.0, 0.0);
             if iir_design_cheby2_analog(order, epsilon, &mut za, &mut pa, &mut ka).is_err() {
                 return Err(Error::Internal("could not design analog filter (cheby2)".into()));
             }
         },
-        IirdesFilterType::Ellip => {
+        IirFilterShape::Ellip => {
+            // elliptic filter design : n-r zeros, n poles, pass/stop-band ripple
             let gp = 10.0f32.powf(-ap / 20.0);
             let gs = 10.0f32.powf(-as_ / 20.0);
             let ep = (1.0 / (gp*gp) - 1.0).sqrt();
@@ -587,7 +639,8 @@ pub fn iir_design(
                 return Err(Error::Internal("could not design analog filter (elliptic)".into()));
             }
         },
-        IirdesFilterType::Bessel => {
+        IirFilterShape::Bessel => {
+            // Bessel filter design : no zeros, n poles
             k0 = Complex32::new(1.0, 0.0);
             if iir_design_bessel_analog(order, &mut za, &mut pa, &mut ka).is_err() {
                 return Err(Error::Internal("could not design analog filter (bessel)".into()));
@@ -608,7 +661,7 @@ pub fn iir_design(
     }
 
     // negate zeros, poles for high-pass and band-stop cases
-    if btype == IirdesBandType::Highpass || btype == IirdesBandType::Bandstop {
+    if btype == IirBandType::Highpass || btype == IirBandType::Bandstop {
         let mut pd_tmp = vec![Complex32::new(0.0, 0.0); 2*order];
         let mut zd_tmp = vec![Complex32::new(0.0, 0.0); 2*order];
 
@@ -622,7 +675,7 @@ pub fn iir_design(
 
     // transform zeros, poles in band-pass, band-stop cases 
     // NOTE: this also doubles the filter order
-    if btype == IirdesBandType::Bandpass || btype == IirdesBandType::Bandstop {
+    if btype == IirBandType::Bandpass || btype == IirBandType::Bandstop {
         let mut zd1 = vec![Complex32::new(0.0, 0.0); 2*n];
         let mut pd1 = vec![Complex32::new(0.0, 0.0); 2*n];
 
@@ -641,7 +694,7 @@ pub fn iir_design(
         order = 2*order;
     }
 
-    if format == IirdesFormat::TransferFunction {
+    if format == IirFormat::TransferFunction {
         // convert complex digital poles/zeros/gain into transfer
         // function : H(z) = B(z) / A(z)
         // where length(B,A) = low/high-pass ? _n + 1 : 2*_n + 1
@@ -662,10 +715,17 @@ pub fn iir_design(
     Ok(())
 }
 
-// checks stability of iir filter
-//  _b      :   feed-forward coefficients [size: _n x 1]
-//  _a      :   feed-back coefficients [size: _n x 1]
-//  _n      :   number of coefficients
+/// Checks stability of iir filter
+/// 
+/// # Arguments
+/// 
+/// * `b` - feed-forward coefficients [size: n x 1]
+/// * `a` - feed-back coefficients [size: n x 1]
+/// * `n` - number of coefficients
+/// 
+/// # Returns
+/// 
+/// `true` if the filter is stable, `false` otherwise
 pub fn iir_design_is_stable(
     _b: &[f32],
     a: &[f32],
@@ -694,12 +754,19 @@ pub fn iir_design_is_stable(
     Ok(true)
 }
 
-// Compute group delay for an IIR filter
-//  _b      : filter coefficients array (numerator), [size: _nb x 1]
-//  _nb     : filter length (numerator)
-//  _a      : filter coefficients array (denominator), [size: _na x 1]
-//  _na     : filter length (denominator)
-//  _fc     : frequency at which delay is evaluated (-0.5 < _fc < 0.5)
+/// Compute group delay for an IIR filter
+/// 
+/// # Arguments
+/// 
+/// * `b` - filter coefficients array (numerator), [size: nb x 1]
+/// * `nb` - filter length (numerator)
+/// * `a` - filter coefficients array (denominator), [size: na x 1]
+/// * `na` - filter length (denominator)
+/// * `fc` - frequency at which delay is evaluated (-0.5 < fc < 0.5)
+/// 
+/// # Returns
+/// 
+/// Group delay at the specified frequency
 pub fn iir_group_delay(b: &[f32], a: &[f32], fc: f32) -> Result<f32> {
     // validate input
     if b.is_empty() {
@@ -753,7 +820,7 @@ mod tests {
     use super::*;
     use test_macro::autotest_annotate;
     use approx::assert_relative_eq;
-    use crate::filter::iir::iirfilt::IirFilt;
+    use crate::filter::iir::iirfilt::IirFilter;
     use crate::utility::test_helpers::{PsdRegion, validate_psd_iirfilt};
 
     #[test]
@@ -927,9 +994,9 @@ mod tests {
         let mut a = [0.0f32; 3];
         let mut b = [0.0f32; 3];
         iir_design(
-            IirdesFilterType::Butter,
-            IirdesBandType::Lowpass,
-            IirdesFormat::TransferFunction,
+            IirFilterShape::Butter,
+            IirBandType::Lowpass,
+            IirFormat::TransferFunction,
             2,        // order
             0.25f32,  // fc, normalized cut-off frequency
             0.0f32,   // f0, center frequency (ignored for low-pass filter)
@@ -973,10 +1040,10 @@ mod tests {
         let nfft = 800;    // number of points to evaluate
 
         // design filter from prototype
-        let q = IirFilt::<f32, f32>::new_prototype(
-            IirdesFilterType::Ellip,
-            IirdesBandType::Lowpass,
-            IirdesFormat::SecondOrderSections,
+        let q = IirFilter::<f32, f32>::new_prototype(
+            IirFilterShape::Ellip,
+            IirBandType::Lowpass,
+            IirFormat::SecondOrderSections,
             n,
             fc,
             0.0,
@@ -1031,10 +1098,10 @@ mod tests {
         let nfft = 800;    // number of points to evaluate
 
         // design filter from prototype
-        let q = IirFilt::<f32, f32>::new_prototype(
-            IirdesFilterType::Cheby1,
-            IirdesBandType::Lowpass,
-            IirdesFormat::SecondOrderSections,
+        let q = IirFilter::<f32, f32>::new_prototype(
+            IirFilterShape::Cheby1,
+            IirBandType::Lowpass,
+            IirFormat::SecondOrderSections,
             n,
             fc,
             0.0,
@@ -1089,10 +1156,10 @@ mod tests {
         let nfft = 800;    // number of points to evaluate
 
         // design filter from prototype
-        let q = IirFilt::new_prototype(
-            IirdesFilterType::Cheby2,
-            IirdesBandType::Lowpass,
-            IirdesFormat::SecondOrderSections,
+        let q = IirFilter::new_prototype(
+            IirFilterShape::Cheby2,
+            IirBandType::Lowpass,
+            IirFormat::SecondOrderSections,
             n,
             fc,
             0.0,
@@ -1147,10 +1214,10 @@ mod tests {
         let nfft = 800;    // number of points to evaluate
 
         // design filter from prototype
-        let q = IirFilt::new_prototype(
-            IirdesFilterType::Butter,
-            IirdesBandType::Lowpass,
-            IirdesFormat::SecondOrderSections,
+        let q = IirFilter::new_prototype(
+            IirFilterShape::Butter,
+            IirBandType::Lowpass,
+            IirFormat::SecondOrderSections,
             n,
             fc,
             0.0,
@@ -1211,10 +1278,10 @@ mod tests {
         let tol = 1e-3;
         let nfft = 800;
 
-        let q = IirFilt::new_prototype(
-            IirdesFilterType::Ellip,
-            IirdesBandType::Highpass,
-            IirdesFormat::SecondOrderSections,
+        let q = IirFilter::new_prototype(
+            IirFilterShape::Ellip,
+            IirBandType::Highpass,
+            IirFormat::SecondOrderSections,
             n,
             fc,
             0.0,
@@ -1243,10 +1310,10 @@ mod tests {
         let tol = 1e-3;
         let nfft = 2400;
 
-        let q = IirFilt::new_prototype(
-            IirdesFilterType::Ellip,
-            IirdesBandType::Bandpass,
-            IirdesFormat::SecondOrderSections,
+        let q = IirFilter::new_prototype(
+            IirFilterShape::Ellip,
+            IirBandType::Bandpass,
+            IirFormat::SecondOrderSections,
             n,
             fc,
             f0,
@@ -1277,10 +1344,10 @@ mod tests {
         let tol = 1e-3;
         let nfft = 2400;
 
-        let q = IirFilt::new_prototype(
-            IirdesFilterType::Ellip,
-            IirdesBandType::Bandstop,
-            IirdesFormat::SecondOrderSections,
+        let q = IirFilter::new_prototype(
+            IirFilterShape::Ellip,
+            IirBandType::Bandstop,
+            IirFormat::SecondOrderSections,
             n,
             fc,
             f0,
@@ -1306,10 +1373,10 @@ mod tests {
         let fc = 0.1;
         let nfft = 960;
 
-        let q = IirFilt::new_prototype(
-            IirdesFilterType::Bessel,
-            IirdesBandType::Lowpass,
-            IirdesFormat::SecondOrderSections,
+        let q = IirFilter::new_prototype(
+            IirFilterShape::Bessel,
+            IirBandType::Lowpass,
+            IirFormat::SecondOrderSections,
             n,
             fc,
             0.0,

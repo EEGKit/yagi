@@ -54,6 +54,7 @@ pub enum FirPmWeightType {
     Lin,
 }
 
+/// A callback function for specifying desired response & weights
 pub type FirPmCallback = fn(frequency: f64, userdata: Option<&dyn std::any::Any>, desired: &mut f64, weight: &mut f64) -> Result<()>;
 
 // TODO consider not using a struct here. is this reusable? could we combine ctor and execute?
@@ -100,7 +101,7 @@ impl FirDesignPm {
     /// 
     /// # Returns
     /// 
-    /// * `FirDesignPm` - Parks-McClellan filter design object
+    /// A new Parks-McClellan filter design object
     pub fn new(
         h_len: usize,
         num_bands: usize,
@@ -131,7 +132,7 @@ impl FirDesignPm {
     /// 
     /// # Returns
     /// 
-    /// * `FirDesignPm` - Parks-McClellan filter design object
+    /// A new Parks-McClellan filter design object
     pub fn new_with_callback(
         h_len: usize,
         num_bands: usize,
@@ -150,7 +151,7 @@ impl FirDesignPm {
     /// 
     /// # Returns
     /// 
-    /// * `Vec<f32>` - filter coefficients
+    /// A vec of filter coefficients
     pub fn execute(&mut self) -> Result<Vec<f32>> {
         // initial guess of extremal frequencies evenly spaced on F 
         // TODO : guarantee at least one extremal frequency lies in each band
@@ -602,7 +603,7 @@ impl FirDesignPm {
 /// 
 /// # Returns
 /// 
-/// * `Vec<f32>` : filter coefficients
+/// A vec of filter coefficients
 pub fn fir_design_pm(
     h_len: usize, 
     num_bands: usize, 
@@ -627,7 +628,7 @@ pub fn fir_design_pm(
 /// 
 /// # Returns
 /// 
-/// * `Vec<f32>` : filter coefficients
+/// A vec of filter coefficients
 pub fn fir_design_pm_lowpass(
     n: usize, 
     fc: f32, 

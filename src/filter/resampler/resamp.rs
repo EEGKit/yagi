@@ -1,6 +1,6 @@
 use crate::error::{Error, Result};
 use crate::dotprod::DotProd;
-use crate::filter::{self, FirPfb};
+use crate::filter::{self, FirPfbFilter};
 use crate::math::nextpow2;
 
 use num_complex::ComplexFloat;
@@ -12,7 +12,7 @@ pub struct Resamp<T, Coeff = T> {
     step: u32,
     phase: u32,
     bits_index: usize,
-    pfb: FirPfb<T, Coeff>,
+    pfb: FirPfbFilter<T, Coeff>,
 }
 
 impl<T, Coeff> Resamp<T, Coeff>
@@ -51,9 +51,9 @@ where
         let gain = (npfb as f32) / gain;
 
         // copy to type-specific array, applying gain
-        let h: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x * gain)).collect();
+        let h: Vec<Coeff> = hf.iter().map(|&x| (x * gain).into()).collect();
 
-        let pfb = FirPfb::new(npfb, &h, n - 1)?;
+        let pfb = FirPfbFilter::new(npfb, &h, n - 1)?;
 
         let mut q = Self {
             m,

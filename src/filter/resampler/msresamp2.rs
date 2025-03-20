@@ -54,7 +54,7 @@ where
             fc,
             f0,
             as_,
-            zeta: <Coeff as From<f32>>::from(1.0 / rate as f32),
+            zeta: (1.0 / rate as f32).into(),
             buffer0: vec![T::default(); rate],
             buffer1: vec![T::default(); rate],
             fc_stage: vec![0.0; num_stages],

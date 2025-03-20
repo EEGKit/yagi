@@ -95,7 +95,8 @@ fn firdespm_halfband_utility(gamma: f32, userdata: &mut Option<&mut dyn std::any
 /// * `ft` : desired transition band
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// A vec of filter coefficients
 pub fn fir_design_pm_halfband_ft(m: usize, ft: f32) -> Result<Vec<f32>> {
     // create and initialize object
     let mut q = FirdespmHalfband::new(m, 4 * m + 1, 1200, ft)?;
@@ -124,7 +125,8 @@ pub fn fir_design_pm_halfband_ft(m: usize, ft: f32) -> Result<Vec<f32>> {
 /// * `as_` : desired stop-band suppression
 ///
 /// # Returns
-/// * `Vec<f32>` : filter coefficients
+/// 
+/// A vec of filter coefficients
 pub fn fir_design_pm_halfband_stopband_attenuation(m: usize, as_: f32) -> Result<Vec<f32>> {
     // estimate transition band given other parameters
     let ft = estimate_req_filter_transition_bandwidth(as_, 4 * m + 1)?;

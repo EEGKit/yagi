@@ -11,7 +11,8 @@ use crate::filter::fir::design::kaiser::fir_design_kaiser;
 /// * `dt`     : filter fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : resulting filter [size: 2*k*m+1]
+/// 
+/// A vec of filter coefficients
 pub fn fir_design_rkaiser(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // validate input
     if k < 2 {
@@ -43,7 +44,8 @@ pub fn fir_design_rkaiser(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<
 /// * `dt`     : filter fractional sample delay
 ///
 /// # Returns
-/// * `Vec<f32>` : resulting filter [size: 2*k*m+1]
+/// 
+/// A vec of filter coefficients
 pub fn fir_design_arkaiser(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec<f32>> {
     // validate input
     if k < 2 {
@@ -98,7 +100,8 @@ pub fn fir_design_arkaiser(k: usize, m: usize, beta: f32, dt: f32) -> Result<Vec
 /// * `beta`   : filter excess bandwidth factor (0,1)
 ///
 /// # Returns
-/// * `f32` : bandwidth adjustment factor
+/// 
+/// Bandwidth adjustment factor
 fn rkaiser_approximate_rho(m: usize, beta: f32) -> f32 {
     if m < 1 {
         panic!("rkaiser_approximate_rho(): m must be greater than 0");
@@ -149,8 +152,10 @@ fn rkaiser_approximate_rho(m: usize, beta: f32) -> f32 {
 /// * `beta`   : filter excess bandwidth factor (0,1)
 /// * `dt`     : filter fractional sample delay
 /// * `h`      : resulting filter [size: 2*k*m+1]
+/// 
 /// # Returns
-/// * `f32` : bandwidth adjustment factor
+/// 
+/// Bandwidth adjustment factor
 fn fir_design_rkaiser_quadratic(k: usize, m: usize, beta: f32, dt: f32, h: &mut [f32]) -> Result<f32> {
     // algorithm:
     //  1. choose initial bounding points [x0,x2] where x0 < x2
@@ -244,7 +249,8 @@ fn fir_design_rkaiser_quadratic(k: usize, m: usize, beta: f32, dt: f32, h: &mut 
 /// * `h`      : filter buffer [size: 2*k*m+1]
 ///
 /// # Returns
-/// * `f32` : RMS of ISI
+/// 
+/// RMS of ISI
 fn fir_design_rkaiser_internal_isi(k: usize, m: usize, beta: f32, dt: f32, rho: f32, h: &mut [f32]) -> Result<f32> {
     // validate input
     if rho < 0.0 || rho > 1.0 {

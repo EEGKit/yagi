@@ -3,8 +3,7 @@ use num_complex::Complex;
 use crate::error::{Error, Result};
 use crate::fft::{fft_run, Direction};
 use crate::fft::spgram::Spgram;
-use crate::filter::FirFilt;
-use crate::filter::iir::iirfilt::IirFilt;
+use crate::filter::{FirFilter, IirFilter};
 use crate::math::nextpow2;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -84,7 +83,7 @@ pub fn validate_psd_signalf(
 }
 
 pub fn validate_psd_firfilt(
-    firfilt: &FirFilt<Complex<f32>, f32>,
+    firfilt: &FirFilter<Complex<f32>, f32>,
     nfft: usize,
     regions: &[PsdRegion],
 ) -> Result<bool> {
@@ -99,7 +98,7 @@ pub fn validate_psd_firfilt(
 }
 
 pub fn validate_psd_firfiltc(
-    firfilt: &FirFilt<Complex<f32>, Complex<f32>>,
+    firfilt: &FirFilter<Complex<f32>, Complex<f32>>,
     nfft: usize,
     regions: &[PsdRegion],
 ) -> Result<bool> {
@@ -114,7 +113,7 @@ pub fn validate_psd_firfiltc(
 }
 
 pub fn validate_psd_iirfilt(
-    iirfilt: &IirFilt<f32, f32>,
+    iirfilt: &IirFilter<f32, f32>,
     nfft: usize,
     regions: &[PsdRegion],
 ) -> Result<bool> {

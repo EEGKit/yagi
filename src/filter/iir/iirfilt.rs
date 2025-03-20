@@ -5,17 +5,24 @@ use std::collections::VecDeque;
 
 use crate::dotprod::DotProd;
 use crate::filter::iir::design;
-use crate::filter::iir::iirfiltsos::IirFiltSos;
+use crate::filter::iir::iirfiltsos::IirFilterSos;
 
+// References:
+//  [Pintelon:1990] Rik Pintelon and Johan Schoukens, "Real-Time
+//      Integration and Differentiation of Analog Signals by Means of
+//      Digital Filtering," IEEE Transactions on Instrumentation and
+//      Measurement, vol 39 no. 6, December 1990.
+
+/// IIR filter type (Normal or Second-Order Sections)
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum IirFilterType {
+enum IirFilterType {
     Norm,
     Sos,
 }
 
-// Struct definition
+/// Infinite impulse response (IIR) filter
 #[derive(Debug, Clone)]
-pub struct IirFilt<T, Coeff = T> {
+pub struct IirFilter<T, Coeff = T> {
     b: Vec<Coeff>,             // numerator (feed-forward coefficients)
     a: Vec<Coeff>,             // denominator (feed-back coefficients)
     v: VecDeque<T>,        // internal filter state (buffer)
@@ -25,19 +32,36 @@ pub struct IirFilt<T, Coeff = T> {
 
     filter_type: IirFilterType,
 
-    qsos: Vec<IirFiltSos<T, Coeff>>, // second-order sections filters
+    qsos: Vec<IirFilterSos<T, Coeff>>, // second-order sections filters
 
     scale: Coeff,              // output scaling factor
 }
 
-impl<T, Coeff> IirFilt<T, Coeff>
+impl<T, Coeff> IirFilter<T, Coeff>
 where
     T: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<Coeff, Output = T>,
     Coeff: Copy + Default + ComplexFloat<Real = f32> + std::ops::Mul<T, Output = T> + Into<Complex32>,
     VecDeque<T>: DotProd<Coeff, Output = T>,
     f32: Into<Coeff>,
 {
-    // create iirfilt (infinite impulse response filter) object
+    /// Create a new IIR filter from a numerator and denominator
+    /// 
+    /// # Notes
+    /// 
+    /// The number of feed-forward and feed-back coefficients do not need to be equal, but they do need to be non-zero.
+    /// Furthermore, the first feed-back coefficient \(a_0\) cannot be equal to zero, otherwise the filter will 
+    /// be invalid as this value is factored out from all coefficients.
+    /// For stability reasons the number of coefficients should reasonably not exceed about 8 for single-precision 
+    /// floating-point.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `b` - The numerator coefficients
+    /// * `a` - The denominator coefficients
+    /// 
+    /// # Returns
+    /// 
+    /// A new IIR filter
     pub fn new(b: &[Coeff], a: &[Coeff]) -> Result<Self> {
         if b.is_empty() {
             return Err(Error::Config("numerator length cannot be zero".into()));
@@ -50,7 +74,7 @@ where
         let na = a.len();
         let n = na.max(nb);
 
-        let mut filter = IirFilt {
+        let mut filter = IirFilter {
             b: b.to_vec(),
             a: a.to_vec(),
             v: VecDeque::from(vec![T::default(); n]),
@@ -89,7 +113,7 @@ where
             return Err(Error::Config("filter must have at least one 2nd-order section".into()));
         }
 
-        let mut filter = IirFilt::<T, Coeff> {
+        let mut filter = IirFilter::<T, Coeff> {
             b: b.to_vec(),
             a: a.to_vec(),
             v: VecDeque::new(),
@@ -104,7 +128,7 @@ where
         for i in 0..nsos {
             let bt = [b[3*i], b[3*i+1], b[3*i+2]];
             let at = [a[3*i], a[3*i+1], a[3*i+2]];
-            filter.qsos.push(IirFiltSos::<T, Coeff>::new(&bt, &at)?);
+            filter.qsos.push(IirFilterSos::<T, Coeff>::new(&bt, &at)?);
         }
 
         filter.set_scale(Coeff::one());
@@ -122,9 +146,9 @@ where
     //  _ap         :   pass-band ripple in dB
     //  _as         :   stop-band ripple in dB
     pub fn new_prototype(
-        ftype: design::IirdesFilterType,
-        btype: design::IirdesBandType,
-        format: design::IirdesFormat,
+        ftype: design::IirFilterShape,
+        btype: design::IirBandType,
+        format: design::IirFormat,
         order: usize,
         fc: f32,
         f0: f32,
@@ -134,14 +158,14 @@ where
         // filter length
         let mut n = order;
 
-        if btype == design::IirdesBandType::Bandpass || btype == design::IirdesBandType::Bandstop {
+        if btype == design::IirBandType::Bandpass || btype == design::IirBandType::Bandstop {
             n *= 2;
         }
 
         let r = n % 2; // odd/even order
         let l = (n - r) / 2; // filter semi-length
 
-        let h_len = if format == design::IirdesFormat::SecondOrderSections { 3*(l+r) } else { n+1 };
+        let h_len = if format == design::IirFormat::SecondOrderSections { 3*(l+r) } else { n+1 };
         let mut b = vec![0.0; h_len];
         let mut a = vec![0.0; h_len];
 
@@ -150,12 +174,12 @@ where
         let b = b.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         let a = a.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
 
-        if format == design::IirdesFormat::SecondOrderSections {
-            let filter = IirFilt::<T, Coeff>::new_sos(&b, &a, l+r)?;
+        if format == design::IirFormat::SecondOrderSections {
+            let filter = IirFilter::<T, Coeff>::new_sos(&b, &a, l+r)?;
             return Ok(filter);
         }
 
-        let filter = IirFilt::<T, Coeff>::new(&b, &a)?;
+        let filter = IirFilter::<T, Coeff>::new(&b, &a)?;
         Ok(filter)
     }
 
@@ -163,10 +187,10 @@ where
     //  _n      : filter order
     //  _fc     : low-pass prototype cut-off frequency
     pub fn new_lowpass(order: usize, fc: f32) -> Result<Self> {
-        let filter = IirFilt::<T, Coeff>::new_prototype(
-            design::IirdesFilterType::Butter,
-            design::IirdesBandType::Lowpass,
-            design::IirdesFormat::SecondOrderSections,
+        let filter = IirFilter::<T, Coeff>::new_prototype(
+            design::IirFilterShape::Butter,
+            design::IirBandType::Lowpass,
+            design::IirFormat::SecondOrderSections,
             order,
             fc,
             0.0,
@@ -213,7 +237,7 @@ where
         let b = b.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         let a = a.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
 
-        let filter = IirFilt::<T, Coeff>::new_sos(&b, &a, 4)?;
+        let filter = IirFilter::<T, Coeff>::new_sos(&b, &a, 4)?;
         Ok(filter)
     }
 
@@ -254,7 +278,7 @@ where
         let b = b.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         let a = a.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
 
-        let filter = IirFilt::<T, Coeff>::new_sos(&b, &a, 4)?;
+        let filter = IirFilter::<T, Coeff>::new_sos(&b, &a, 4)?;
         Ok(filter)
     }   
 
@@ -274,7 +298,7 @@ where
         let b = bf.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         let a = af.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
 
-        let mut filter = IirFilt::<T, Coeff>::new(&b, &a)?;
+        let mut filter = IirFilter::<T, Coeff>::new(&b, &a)?;
         filter.set_scale(Coeff::from((1.0 - alpha).sqrt()).unwrap());
         Ok(filter)
     }
@@ -301,7 +325,7 @@ where
         let b = bf.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
         let a = af.iter().map(|&x| x.into()).collect::<Vec<Coeff>>();
 
-        let filter = IirFilt::<T, Coeff>::new_sos(&b, &a, 1)?;
+        let filter = IirFilter::<T, Coeff>::new_sos(&b, &a, 1)?;
         Ok(filter)
     }
 
@@ -458,7 +482,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use design::{IirdesBandType, IirdesFilterType, IirdesFormat};
+    use design::{IirBandType, IirFilterShape, IirFormat};
     use test_macro::autotest_annotate;
     use crate::fft::spgram::Spgram;
     use crate::utility::test_helpers::{PsdRegion, validate_psd_spectrum};
@@ -482,7 +506,7 @@ mod tests {
         }
     
         // create integrator and run on sample data
-        let mut q = IirFilt::<f32, f32>::new_integrator().unwrap();
+        let mut q = IirFilter::<f32, f32>::new_integrator().unwrap();
         q.execute_block(&buf_0, &mut buf_1).unwrap();
     
         // check that last value matches expected
@@ -505,7 +529,7 @@ mod tests {
         }
     
         // create differentiator and run on sample data
-        let mut q = IirFilt::<f32, f32>::new_differentiator().unwrap();
+        let mut q = IirFilter::<f32, f32>::new_differentiator().unwrap();
         q.execute_block(&buf_0, &mut buf_1).unwrap();
     
         // check that derivative is equal to 1
@@ -522,7 +546,7 @@ mod tests {
         let tol = 0.7f32; // error tolerance [dB]
 
         // create base object
-        let mut filter = IirFilt::<Complex32, f32>::new_dc_blocker(alpha).unwrap();
+        let mut filter = IirFilter::<Complex32, f32>::new_dc_blocker(alpha).unwrap();
 
         // create and configure objects
         let mut q = Spgram::new(nfft, crate::math::WindowType::Hann, nfft/2, nfft/4).unwrap();
@@ -548,11 +572,11 @@ mod tests {
         assert!(validate_psd_spectrum(&psd, nfft, &regions).unwrap());
     }
 
-    fn testbench_iirfilt_copy(format: IirdesFormat) {
+    fn testbench_iirfilt_copy(format: IirFormat) {
         // create base object
-        let mut q0 = IirFilt::<Complex32, f32>::new_prototype(
-            IirdesFilterType::Ellip,
-            IirdesBandType::Lowpass,
+        let mut q0 = IirFilter::<Complex32, f32>::new_prototype(
+            IirFilterShape::Ellip,
+            IirBandType::Lowpass,
             format,
             9,
             0.2,
@@ -587,26 +611,26 @@ mod tests {
     #[test]
     #[autotest_annotate(autotest_iirfilt_copy_tf)]
     fn test_iirfilt_copy_tf() {
-        testbench_iirfilt_copy(IirdesFormat::TransferFunction);
+        testbench_iirfilt_copy(IirFormat::TransferFunction);
     }
 
     #[test]
     #[autotest_annotate(autotest_iirfilt_copy_sos)]
     fn test_iirfilt_copy_sos() {
-        testbench_iirfilt_copy(IirdesFormat::SecondOrderSections);
+        testbench_iirfilt_copy(IirFormat::SecondOrderSections);
     }
 
     #[test]
     #[autotest_annotate(autotest_iirfilt_config)]
     fn test_iirfilt_config() {
         // test copying/creating invalid objects
-        assert!(IirFilt::<Complex32, f32>::new(&[], &[]).is_err());
-        assert!(IirFilt::<Complex32, f32>::new(&[0.0], &[]).is_err());
-        assert!(IirFilt::<Complex32, f32>::new(&[], &[1.0]).is_err());
-        assert!(IirFilt::<Complex32, f32>::new_sos(&[], &[], 0).is_err());
+        assert!(IirFilter::<Complex32, f32>::new(&[], &[]).is_err());
+        assert!(IirFilter::<Complex32, f32>::new(&[0.0], &[]).is_err());
+        assert!(IirFilter::<Complex32, f32>::new(&[], &[1.0]).is_err());
+        assert!(IirFilter::<Complex32, f32>::new_sos(&[], &[], 0).is_err());
 
         // create valid object
-        let mut filter = IirFilt::<Complex32, f32>::new_lowpass(7, 0.1).unwrap();
+        let mut filter = IirFilter::<Complex32, f32>::new_lowpass(7, 0.1).unwrap();
 
         // check properties
         filter.set_scale(7.22);
@@ -636,7 +660,7 @@ mod tests {
         }
 
         // create filter
-        let filter = IirFilt::<f32, f32>::new(&b, &a).unwrap();
+        let filter = IirFilter::<f32, f32>::new(&b, &a).unwrap();
 
         // run tests again
         for i in 0..4 {
@@ -705,7 +729,7 @@ mod tests {
         //
 
         // create filter
-        let filter = IirFilt::<f32, f32>::new(&b, &a).unwrap();
+        let filter = IirFilter::<f32, f32>::new(&b, &a).unwrap();
 
         // run tests again
         for i in 0..7 {
@@ -756,7 +780,7 @@ mod tests {
         ];
 
         // create filter
-        let filter = IirFilt::<f32, f32>::new_sos(&b, &a, 4).unwrap();
+        let filter = IirFilter::<f32, f32>::new_sos(&b, &a, 4).unwrap();
 
         // run tests
         for i in 0..7 {
@@ -784,7 +808,7 @@ mod tests {
         let tol = 0.001f32;
     
         // load filter coefficients externally
-        let mut q = IirFilt::<f32, f32>::new(b, a).unwrap();
+        let mut q = IirFilter::<f32, f32>::new(b, a).unwrap();
     
         // allocate memory for output
         let mut y_test = vec![0.0; y.len()];
@@ -848,7 +872,7 @@ mod tests {
         let tol = 0.001f32;
     
         // load filter coefficients externally
-        let mut q = IirFilt::<Complex32, f32>::new(b, a).unwrap();
+        let mut q = IirFilter::<Complex32, f32>::new(b, a).unwrap();
     
         // allocate memory for output
         let mut y_test = vec![Complex32::new(0.0, 0.0); y.len()];
@@ -913,7 +937,7 @@ mod tests {
         let tol = 0.001f32;
     
         // load filter coefficients externally
-        let mut q = IirFilt::<Complex32, Complex32>::new(b, a).unwrap();
+        let mut q = IirFilter::<Complex32, Complex32>::new(b, a).unwrap();
     
         // allocate memory for output
         let mut y_test = vec![Complex32::new(0.0, 0.0); y.len()];

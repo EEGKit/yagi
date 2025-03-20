@@ -2,11 +2,17 @@ use crate::error::{Error, Result};
 use num_complex::Complex32;
 use std::f32::consts::PI;
 
-// Compute analog zeros, poles, gain of low-pass Butterworth
-// filter, grouping complex conjugates together. If filter
-// order is odd, the single real pole (-1) is at the end of
-// the array.  There are no zeros for the analog Butterworth
-// filter.  The gain is unity.
+/// Compute analog zeros, poles, gain of low-pass Butterworth filter, grouping 
+/// complex conjugates together. If filter order is odd, the single real pole 
+/// (-1) is at the end of the array. There are no zeros for the analog Butterworth 
+/// filter. The gain is unity.
+/// 
+/// # Arguments
+/// 
+/// * `n` - filter order
+/// * `za` - output analog zeros [length: 0]
+/// * `pa` - output analog poles [length: _n]
+/// * `ka` - output analog gain
 pub fn iir_design_butter_analog(
     n: usize,
     za: &mut Vec<Complex32>,

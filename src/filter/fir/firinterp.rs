@@ -4,19 +4,35 @@ use crate::filter;
 use std::f32::consts::PI;
 use num_complex::ComplexFloat;
 
+/// Finite impulse response (FIR) interpolator
 #[derive(Clone, Debug)]
-pub struct FirInterp<T, Coeff = T> {
+pub struct FirInterpolationFilter<T, Coeff = T> {
     h_sub_len: usize,
     interpolation_factor: usize,
-    filterbank: filter::FirPfb<T, Coeff>,
+    filterbank: filter::FirPfbFilter<T, Coeff>,
 }
 
-impl<T, Coeff> FirInterp<T, Coeff>
+impl<T, Coeff> FirInterpolationFilter<T, Coeff>
 where
     Coeff: Clone + Copy + ComplexFloat<Real = f32> + From<f32>,
     T: Clone + Copy + ComplexFloat<Real = f32> + std::ops::Mul<Coeff, Output = T> + Default,
     [Coeff]: DotProd<T, Output = T>,
 {
+    /// Create a new interpolator from external coefficients
+    /// 
+    /// If the input filter length is not a multiple of the interpolation
+    /// factor, the object internally pads the coefficients with zeros
+    /// to compensate.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `interp` - interpolation factor
+    /// * `h` - filter coefficients
+    /// * `h_len` - filter length
+    /// 
+    /// # Returns
+    /// 
+    /// A new interpolator
     pub fn new(interp: usize, h: &[Coeff], h_len: usize) -> Result<Self> {
         if interp < 2 {
             return Err(Error::Config("interp factor must be greater than 1".into()));
@@ -34,7 +50,7 @@ where
         let mut h_padded = vec![Coeff::zero(); h_len_padded];
         h_padded[..h_len].clone_from_slice(&h[..h_len]);
 
-        let filterbank = filter::FirPfb::new(interp, &h_padded, h_len_padded)?;
+        let filterbank = filter::FirPfbFilter::new(interp, &h_padded, h_len_padded)?;
 
         Ok(Self {
             h_sub_len,
@@ -43,6 +59,17 @@ where
         })
     }
 
+    /// Create a new interpolator from a Kaiser prototype
+    /// 
+    /// # Arguments
+    /// 
+    /// * `interp` - interpolation factor
+    /// * `m` - filter delay
+    /// * `as_` - stop-band attenuation [dB]
+    /// 
+    /// # Returns
+    /// 
+    /// A new interpolator
     pub fn new_kaiser(interp: usize, m: usize, as_: f32) -> Result<Self> {
         if interp < 2 {
             return Err(Error::Config("interp factor must be greater than 1".into()));
@@ -58,11 +85,24 @@ where
         let fc = 0.5 / interp as f32;
         let hf = filter::fir_design_kaiser(h_len, fc, as_, 0.0)?;
 
-        let hc: Vec<Coeff> = hf.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
+        let hc: Vec<Coeff> = hf.iter().map(|&x| x.into()).collect();
         Self::new(interp, &hc, h_len - 1)
     }
 
-    pub fn new_prototype(filter_type: filter::FirFilterType, interp: usize, m: usize, beta: f32, dt: f32) -> Result<Self> {
+    /// Create a new interpolator from a filter prototype
+    /// 
+    /// # Arguments
+    /// 
+    /// * `filter_type` - filter type
+    /// * `interp` - interpolation factor
+    /// * `m` - filter delay (symbols)
+    /// * `beta` - excess bandwidth factor
+    /// * `dt` - fractional sample delay
+    /// 
+    /// # Returns
+    /// 
+    /// A new interpolator
+    pub fn new_prototype(filter_type: filter::FirFilterShape, interp: usize, m: usize, beta: f32, dt: f32) -> Result<Self> {
         if interp < 2 {
             return Err(Error::Config("interp factor must be greater than 1".into()));
         }
@@ -79,10 +119,19 @@ where
         let h_len = 2 * interp * m + 1;
         let h = filter::fir_design_prototype(filter_type, interp, m, beta, dt)?;
 
-        let hc: Vec<Coeff> = h.iter().map(|&x| <Coeff as From<f32>>::from(x)).collect();
+        let hc: Vec<Coeff> = h.iter().map(|&x| x.into()).collect();
         Self::new(interp, &hc, h_len)
     }
 
+    /// Create a new linear interpolator
+    /// 
+    /// # Arguments
+    /// 
+    /// * `interp` - interpolation factor
+    /// 
+    /// # Returns
+    /// 
+    /// A new linear interpolator
     pub fn new_linear(interp: usize) -> Result<Self> {
         if interp < 1 {
             return Err(Error::Config("interp factor must be greater than 1".into()));
@@ -90,13 +139,23 @@ where
 
         let mut hc = vec![Coeff::zero(); 2 * interp];
         for i in 0..interp {
-            hc[i] = <Coeff as From<f32>>::from(i as f32 / interp as f32);
-            hc[interp + i] = <Coeff as From<f32>>::from(1.0 - i as f32 / interp as f32);
+            hc[i] = (i as f32 / interp as f32).into();
+            hc[interp + i] = (1.0 - i as f32 / interp as f32).into();
         }
 
         Self::new(interp, &hc, 2 * interp)
     }
 
+    /// Create a new window interpolator
+    /// 
+    /// # Arguments
+    /// 
+    /// * `interp` - interpolation factor
+    /// * `m` - filter semi-length
+    /// 
+    /// # Returns
+    ///
+    /// A new window interpolator
     pub fn new_window(interp: usize, m: usize) -> Result<Self> {
         if interp < 1 {
             return Err(Error::Config("interp factor must be greater than 1".into()));
@@ -108,32 +167,60 @@ where
         let h_len = 2 * m * interp;
         let mut hc = vec![Coeff::zero(); h_len];
         for i in 0..h_len {
-            hc[i] = <Coeff as From<f32>>::from((PI * i as f32 / (2 * m * interp) as f32).sin().powi(2));
+            hc[i] = (PI * i as f32 / (2 * m * interp) as f32).sin().powi(2).into();
         }
 
         Self::new(interp, &hc, h_len)
     }
 
+    /// Reset the interpolator
     pub fn reset(&mut self) -> () {
         self.filterbank.reset()
     }
 
+    /// Get the interpolation rate
+    /// 
+    /// # Returns
+    /// 
+    /// The interpolation rate
     pub fn get_interp_rate(&self) -> usize {
         self.interpolation_factor
     }
 
+    /// Get the sub-filter length (length of each poly-phase filter)
+    /// 
+    /// # Returns
+    /// 
+    /// The sub-filter length
     pub fn get_sub_len(&self) -> usize {
         self.h_sub_len
     }
 
+    /// Set the output scaling for interpolator
+    /// 
+    /// # Arguments
+    /// 
+    /// * `scale` - scaling factor to apply to each output sample
     pub fn set_scale(&mut self, scale: Coeff) -> () {
         self.filterbank.set_scale(scale)
     }
 
+    /// Get the output scaling for interpolator
+    /// 
+    /// # Returns
+    /// 
+    /// The output scaling factor
     pub fn get_scale(&self) -> Coeff {
         self.filterbank.get_scale()
     }
 
+    /// Execute the interpolator on a single input sample and write the
+    /// corresponding output samples
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - input sample
+    /// * `y` - output samples (size: `interp` x 1)
     pub fn execute(&mut self, x: T, y: &mut [T]) -> Result<()> {
         self.filterbank.push(x);
 
@@ -143,6 +230,12 @@ where
         Ok(())
     }
 
+    /// Execute the interpolator on a block of input samples
+    /// 
+    /// # Arguments
+    /// 
+    /// * `x` - input samples (size: `n` x 1)
+    /// * `y` - output samples (size: `n * interp` x 1)
     pub fn execute_block(&mut self, x: &[T], y: &mut [T]) -> Result<()> {
         for (i, &xi) in x.iter().enumerate() {
             self.execute(xi, &mut y[i * self.interpolation_factor..(i + 1) * self.interpolation_factor])?;
@@ -150,6 +243,11 @@ where
         Ok(())
     }
 
+    /// Execute the interpolator with zero-valued input (e.g. flush internal state)
+    /// 
+    /// # Arguments
+    /// 
+    /// * `y` - output samples (size: `interp` x 1)
     pub fn flush(&mut self, y: &mut [T]) -> Result<()> {
         self.execute(T::zero(), y)
     }
@@ -165,14 +263,14 @@ mod tests {
     #[test]
     #[autotest_annotate(autotest_firinterp_rrrf_common)]
     fn test_firinterp_rrrf_common() {
-        let interp = FirInterp::<f32, f32>::new_kaiser(17, 4, 60.0).unwrap();
+        let interp = FirInterpolationFilter::<f32, f32>::new_kaiser(17, 4, 60.0).unwrap();
         assert_eq!(interp.get_interp_rate(), 17);
     }
 
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_common)]
     fn test_firinterp_crcf_common() {
-        let interp = FirInterp::<Complex32, f32>::new_kaiser(7, 4, 60.0).unwrap();
+        let interp = FirInterpolationFilter::<Complex32, f32>::new_kaiser(7, 4, 60.0).unwrap();
         assert_eq!(interp.get_interp_rate(), 7);
     }
 
@@ -192,7 +290,7 @@ mod tests {
         ];
 
         let m = 4; // firinterp factor
-        let mut interp = FirInterp::<f32, f32>::new(m, &h, h.len()).unwrap();
+        let mut interp = FirInterpolationFilter::<f32, f32>::new(m, &h, h.len()).unwrap();
 
         let x = [1.0, -1.0, 1.0, 1.0];
         let mut y = [0.0; 16];
@@ -243,7 +341,7 @@ mod tests {
         ];
 
         let m = 4; // firinterp factor
-        let mut interp = FirInterp::<Complex32, f32>::new(m, &h, h.len()).unwrap();
+        let mut interp = FirInterpolationFilter::<Complex32, f32>::new(m, &h, h.len()).unwrap();
 
         //  x = [1+j*0.2, -0.2+j*1.3, 0.5+j*0.3, 1.1-j*0.2]
         let x: [Complex32; 4] = [
@@ -288,10 +386,10 @@ mod tests {
         }
     }
 
-    fn testbench_firinterp_crcf_nyquist(ftype: filter::FirFilterType, m: usize, k: usize, beta: f32) {
+    fn testbench_firinterp_crcf_nyquist(ftype: filter::FirFilterShape, m: usize, k: usize, beta: f32) {
         let tol = 1e-6;
         // create interpolator object
-        let mut interp = FirInterp::<Complex32, f32>::new_prototype(ftype, m, k, beta, 0.0).unwrap();
+        let mut interp = FirInterpolationFilter::<Complex32, f32>::new_prototype(ftype, m, k, beta, 0.0).unwrap();
 
         // create input buffer of symbols to interpolate
         let num_symbols = k + 16;
@@ -319,32 +417,32 @@ mod tests {
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_rnyquist_0)]
     fn test_firinterp_crcf_rnyquist_0() {
-        testbench_firinterp_crcf_nyquist(filter::FirFilterType::Kaiser, 2, 9, 0.3);
+        testbench_firinterp_crcf_nyquist(filter::FirFilterShape::Kaiser, 2, 9, 0.3);
     }
 
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_rnyquist_1)]
     fn test_firinterp_crcf_rnyquist_1() {
-        testbench_firinterp_crcf_nyquist(filter::FirFilterType::Kaiser, 3, 9, 0.3);
+        testbench_firinterp_crcf_nyquist(filter::FirFilterShape::Kaiser, 3, 9, 0.3);
     }
 
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_rnyquist_2)]
     fn test_firinterp_crcf_rnyquist_2() {
-        testbench_firinterp_crcf_nyquist(filter::FirFilterType::Kaiser, 7, 9, 0.3);
+        testbench_firinterp_crcf_nyquist(filter::FirFilterShape::Kaiser, 7, 9, 0.3);
     }
 
     #[test]
     #[autotest_annotate(autotest_firinterp_crcf_rnyquist_3)]
     fn test_firinterp_crcf_rnyquist_3() {
-        testbench_firinterp_crcf_nyquist(filter::FirFilterType::Rcos, 2, 9, 0.3);
+        testbench_firinterp_crcf_nyquist(filter::FirFilterShape::Rcos, 2, 9, 0.3);
     }
 
     #[test]
     #[autotest_annotate(autotest_firinterp_copy)]
     fn test_firinterp_copy() {
         // create base object
-        let mut q0 = FirInterp::<Complex32, f32>::new_kaiser(3, 7, 60.0).unwrap();
+        let mut q0 = FirInterpolationFilter::<Complex32, f32>::new_kaiser(3, 7, 60.0).unwrap();
         q0.set_scale(0.12345);
 
         // run samples through filter
@@ -375,7 +473,7 @@ mod tests {
     fn test_firinterp_flush() {
         // create base object
         let m = 7;
-        let mut q = FirInterp::<Complex32, f32>::new_kaiser(3, m, 60.0).unwrap();
+        let mut q = FirInterpolationFilter::<Complex32, f32>::new_kaiser(3, m, 60.0).unwrap();
 
         // run samples through filter
         let mut buf = [Complex32::new(0.0, 0.0); 3];

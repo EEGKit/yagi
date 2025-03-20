@@ -180,7 +180,7 @@ where
 mod tests {
     use super::*;
     use test_macro::autotest_annotate;
-    use crate::filter::FirFilt;
+    use crate::filter::FirFilter;
     use crate::random::randnf;
     use approx::assert_relative_eq;
 
@@ -217,7 +217,7 @@ mod tests {
 
         // create channel filter
         h[0] = 1.0f32;
-        let mut f = FirFilt::<f32, f32>::new(&h).unwrap();
+        let mut f = FirFilter::<f32, f32>::new(&h).unwrap();
 
         // data sequence
         let d = &EQRLS_RRRF_AUTOTEST_DATA_SEQUENCE;
@@ -250,7 +250,7 @@ mod tests {
 
         // create channel filter
         let hc = [1.0f32, -0.08f32, 0.32f32, 0.01f32, -0.06f32, 0.07f32, -0.03f32];
-        let mut fc = FirFilt::<f32, f32>::new(&hc).unwrap();
+        let mut fc = FirFilter::<f32, f32>::new(&hc).unwrap();
 
         // run training samples through object
         let nstd = 0.001f32;
