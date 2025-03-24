@@ -1480,36 +1480,36 @@
 ## freqmodem
 | Test | Liquid | Yagi |
 | ---- | ------ | ---- |
-| freqmodem_kf_0_02                        | ✅ | ❓ |
-| freqmodem_kf_0_04                        | ✅ | ❓ |
-| freqmodem_kf_0_08                        | ✅ | ❓ |
+| freqmodem_kf_0_02                        | ✅ | ✅ |
+| freqmodem_kf_0_04                        | ✅ | ✅ |
+| freqmodem_kf_0_08                        | ✅ | ✅ |
 
 
 ## fskmodem
 | Test | Liquid | Yagi |
 | ---- | ------ | ---- |
-| fskmodem_norm_M2                         | ✅ | ❓ |
-| fskmodem_norm_M4                         | ✅ | ❓ |
-| fskmodem_norm_M8                         | ✅ | ❓ |
-| fskmodem_norm_M16                        | ✅ | ❓ |
-| fskmodem_norm_M32                        | ✅ | ❓ |
-| fskmodem_norm_M64                        | ✅ | ❓ |
-| fskmodem_norm_M128                       | ✅ | ❓ |
-| fskmodem_norm_M256                       | ✅ | ❓ |
-| fskmodem_norm_M512                       | ✅ | ❓ |
-| fskmodem_norm_M1024                      | ✅ | ❓ |
-| fskmodem_misc_M2                         | ✅ | ❓ |
-| fskmodem_misc_M4                         | ✅ | ❓ |
-| fskmodem_misc_M8                         | ✅ | ❓ |
-| fskmodem_misc_M16                        | ✅ | ❓ |
-| fskmodem_misc_M32                        | ✅ | ❓ |
-| fskmodem_misc_M64                        | ✅ | ❓ |
-| fskmodem_misc_M128                       | ✅ | ❓ |
-| fskmodem_misc_M256                       | ✅ | ❓ |
-| fskmodem_misc_M512                       | ✅ | ❓ |
-| fskmodem_misc_M1024                      | ✅ | ❓ |
-| fskmod_copy                              | ✅ | ❓ |
-| fskdem_copy                              | ✅ | ❓ |
+| fskmodem_norm_M2                         | ✅ | ✅ |
+| fskmodem_norm_M4                         | ✅ | ✅ |
+| fskmodem_norm_M8                         | ✅ | ✅ |
+| fskmodem_norm_M16                        | ✅ | ✅ |
+| fskmodem_norm_M32                        | ✅ | ✅ |
+| fskmodem_norm_M64                        | ✅ | ✅ |
+| fskmodem_norm_M128                       | ✅ | ✅ |
+| fskmodem_norm_M256                       | ✅ | ✅ |
+| fskmodem_norm_M512                       | ✅ | ✅ |
+| fskmodem_norm_M1024                      | ✅ | ✅ |
+| fskmodem_misc_M2                         | ✅ | ✅ |
+| fskmodem_misc_M4                         | ✅ | ✅ |
+| fskmodem_misc_M8                         | ✅ | ✅ |
+| fskmodem_misc_M16                        | ✅ | ✅ |
+| fskmodem_misc_M32                        | ✅ | ✅ |
+| fskmodem_misc_M64                        | ✅ | ✅ |
+| fskmodem_misc_M128                       | ✅ | ✅ |
+| fskmodem_misc_M256                       | ✅ | ✅ |
+| fskmodem_misc_M512                       | ✅ | ✅ |
+| fskmodem_misc_M1024                      | ✅ | ✅ |
+| fskmod_copy                              | ✅ | ✅ |
+| fskdem_copy                              | ✅ | ✅ |
 
 
 ## gmskmodem
