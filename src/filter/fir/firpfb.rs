@@ -66,11 +66,7 @@ where
 
     /// Create a new FIR PFB filter bank with default parameters
     /// 
-    /// This is equivalent to:
-    /// 
-    /// ```
-    /// FirPfbFilter::new_kaiser(num_filters, m, 0.5, 60.0)
-    /// ```
+    /// This is equivalent to FirPfbFilter::new_kaiser(num_filters, m, 0.5, 60.0)
     /// 
     /// # Arguments
     /// 

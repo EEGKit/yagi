@@ -272,16 +272,17 @@ pub fn iir_design_bilinear_a2d(
 
 /// compute bilinear z-transform using polynomial expansion in numerator and
 /// denominator
-/// 
+/// <pre>
 ///          b[0] + b[1]*s + ... + b[nb]*s^(nb-1)
 /// H(s) =   ------------------------------------
 ///          a[0] + a[1]*s + ... + a[na]*s^(na-1)
-/// 
+/// </pre>
 /// computes H(z) = H( s -> _m*(z-1)/(z+1) ) and expands as
-/// 
+/// <pre>
 ///          bd[0] + bd[1]*z^-1 + ... + bd[nb]*z^-n
 /// H(z) =   --------------------------------------
 ///          ad[0] + ad[1]*z^-1 + ... + ad[nb]*z^-m
+/// </pre>
 /// 
 /// # Arguments
 /// 
