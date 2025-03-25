@@ -1,5 +1,7 @@
 # yagi
 
+[![GitHub Actions Status](https://img.shields.io/github/actions/workflow/status/brian-armstrong/yagi/rust.yml)](https://github.com/brian-armstrong/yagi/actions/workflows/rust.yml) [![crates.io](https://img.shields.io/crates/v/yagi)](https://crates.io/crates/yagi) [![docs.rs](https://img.shields.io/docsrs/yagi)](https://docs.rs/yagi)
+
 Batteries-included DSP library for Rust.
 
 ## liquid-dsp, Rewritten in Rust
